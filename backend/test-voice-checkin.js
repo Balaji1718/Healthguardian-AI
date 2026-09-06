@@ -19,6 +19,7 @@ import {
   checkEmergencySymptoms,
   extractWithRules,
   extractionSchema,
+  convertAndImproveTranscript,
 } from "./conversational-checkin.js";
 
 let passCount = 0;
@@ -174,6 +175,33 @@ assert(unsupported.fallback === "conversational", "Offers conversational text fa
 const denied = handleBrowserSpeechCapability(true, false);
 assert(denied.canVoice === false, "Microphone permission denied handled gracefully");
 assert(denied.fallback === "conversational", "Offers conversational text fallback on mic denial");
+
+// --- TEST 13: Pure Tanglish (Latin Script) Extraction ---
+console.log("\n[Test 13: Pure Tanglish (Latin Script) Extraction]");
+const pureTanglish = "Iniku 7 hours thoonginen, 6 glass thanni kudichen, 30 mins walk paninen, romba tired-ah iruku, thalavali.";
+const t13 = extractWithRules(pureTanglish, "ta");
+assert(t13.sleepHours === 7, "Tanglish: 7 hours thoonginen -> sleepHours = 7");
+assert(t13.waterGlasses === 6, "Tanglish: 6 glass thanni kudichen -> waterGlasses = 6");
+assert(t13.exerciseMinutes === 30, "Tanglish: 30 mins walk paninen -> exerciseMinutes = 30");
+assert(t13.exerciseType === "Walking", "Tanglish: walk paninen -> exerciseType = Walking");
+assert(t13.wellbeing === "tired", "Tanglish: romba tired-ah iruku -> wellbeing = tired");
+assert(t13.symptoms.includes("headache"), "Tanglish: thalavali -> symptoms includes headache");
+
+// --- TEST 14: Target Language-Specific Notes Summary ---
+console.log("\n[Test 14: Target Language-Specific Notes Summary]");
+assert(/மணி\s*நேரம்\s*தூக்கம்/.test(t13.notes), "Tamil app language produces Tamil script notes from Tanglish");
+const t14En = extractWithRules(pureTanglish, "en");
+assert(/Slept ~7 hours/.test(t14En.notes), "English app language produces clean English notes from Tanglish");
+
+// --- TEST 15: Tanglish Conversion into Application Language ---
+console.log("\n[Test 15: Tanglish Conversion into Application Language]");
+const convTa = await convertAndImproveTranscript(pureTanglish, "ta");
+assert(convTa.ok === true, "Tanglish to Tamil conversion succeeds");
+assert(/தூங்கினேன்|தண்ணீர்|நடைப்பயிற்சி|சோர்வாக/.test(convTa.improvedText), "Tanglish converted to Tamil script when app language is Tamil");
+
+const convEn = await convertAndImproveTranscript(pureTanglish, "en");
+assert(convEn.ok === true, "Tanglish to English conversion succeeds");
+assert(/slept|water|walked|feeling tired/.test(convEn.improvedText), "Tanglish converted to clean English when app language is English");
 
 console.log("\n============================================================");
 console.log(`Phase 10C Test Results: ${passCount} PASS, ${failCount} FAIL (Total: ${passCount + failCount})`);

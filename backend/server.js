@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeCompletion, testProvider } from './ai-provider-router.js';
 import { executeWebSearch } from './web-search.js';
-import { extractConversationalCheckin } from './conversational-checkin.js';
+import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +90,18 @@ app.post('/api/ai/extract-checkin', async (req, res) => {
     return res.status(200).json(result);
   } catch {
     return res.status(500).json({ ok: false, error: 'Conversational extraction failed.' });
+  }
+});
+
+app.post('/api/ai/improve-transcript', async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text : '';
+  const language = typeof req.body?.language === 'string' ? req.body.language : 'en';
+  if (!text.trim()) return res.status(400).json({ ok: false, error: 'Text is required.' });
+  try {
+    const result = await convertAndImproveTranscript(text, language);
+    return res.status(200).json(result);
+  } catch {
+    return res.status(500).json({ ok: false, error: 'Transcript improvement failed.' });
   }
 });
 

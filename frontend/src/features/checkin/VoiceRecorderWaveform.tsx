@@ -18,9 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   SUPPORTED_SPEECH_LANGUAGES,
+  improveTranscriptWithLanguage,
   normalizeSpeechTranscript,
   useSpeechRecognition,
 } from "@/features/checkin/useSpeechRecognition";
+import { useTranslation } from "@/locales/i18n";
 
 export interface VoiceRecorderProps {
   onTranscriptReady: (transcript: string, language: string) => void;
@@ -31,6 +33,7 @@ type RecorderState = "idle" | "recording" | "paused" | "stopped";
 
 export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceRecorderProps) {
   const speech = useSpeechRecognition();
+  const { language } = useTranslation();
   const [recorderState, setRecorderState] = useState<RecorderState>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [editableTranscript, setEditableTranscript] = useState("");
@@ -51,11 +54,17 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
     }
   }, [speech.transcript]);
 
-  // Timer management
+  // Extended timer management (up to 300s / 5 minutes)
   useEffect(() => {
     if (recorderState === "recording") {
       timerRef.current = window.setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        setElapsedSeconds((prev) => {
+          if (prev >= 300) {
+            handleStopRecording();
+            return 300;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -152,12 +161,19 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
     setRecorderState("stopped");
   };
 
-  const handleImproveTranscript = () => {
-    if (!editableTranscript.trim()) return;
-    const improved = normalizeSpeechTranscript(editableTranscript, speech.language);
-    setEditableTranscript(improved);
+  const handleImproveTranscript = async () => {
+    if (!editableTranscript.trim() || isImprovingTranscript) return;
     setIsImprovingTranscript(true);
-    window.setTimeout(() => setIsImprovingTranscript(false), 600);
+    try {
+      const improved = await improveTranscriptWithLanguage(editableTranscript, language);
+      if (improved) {
+        setEditableTranscript(improved);
+      }
+    } catch (err) {
+      console.warn("Improve transcript error:", err);
+    } finally {
+      setIsImprovingTranscript(false);
+    }
   };
 
   // Cancel / Delete
@@ -229,7 +245,7 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
             <Mic className="size-3" /> Voice Check-in
           </Badge>
           <span className="text-muted-foreground text-[11px]">
-            {recorderState === "recording" && "Recording in progress"}
+            {recorderState === "recording" && "Recording in progress — take your time (up to 5m)"}
             {recorderState === "paused" && "Recording paused"}
             {recorderState === "stopped" && "Ready to verify"}
           </span>
@@ -346,13 +362,14 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
             <Button
               type="button"
               variant="default"
-              size="icon"
+              size="sm"
               onClick={handleStopRecording}
-              className="size-8 rounded-full bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+              className="h-8 gap-1.5 px-3 rounded-full bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 font-medium text-xs"
               title="Finish recording"
               aria-label="Finish recording"
             >
-              <Square className="size-3.5 fill-current" />
+              <Check className="size-3.5" />
+              <span>Done</span>
             </Button>
           </div>
         </div>

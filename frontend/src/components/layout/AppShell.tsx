@@ -31,30 +31,50 @@ import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { LanguageSelector } from "@/features/i18n/LanguageSelector";
 import { useTranslation } from "@/locales/i18n";
 
-export const NAV_ITEMS = [
-  { to: "/app/dashboard", key: "nav.dashboard", defaultLabel: "Dashboard", icon: Gauge },
+export const NAV_SECTIONS = [
   {
-    to: "/app/checkin",
-    key: "nav.dailyCheckin",
-    defaultLabel: "Daily Check-in",
-    icon: CalendarCheck,
+    titleKey: "nav.sectionDaily",
+    defaultTitle: "Daily Routine",
+    items: [
+      { to: "/app/dashboard", key: "nav.dashboard", defaultLabel: "Dashboard", icon: Gauge },
+      {
+        to: "/app/checkin",
+        key: "nav.dailyCheckin",
+        defaultLabel: "Daily Check-in",
+        icon: CalendarCheck,
+      },
+      { to: "/app/assistant", key: "nav.assistant", defaultLabel: "AI Assistant", icon: Bot },
+    ],
   },
-  { to: "/app/history", key: "nav.history", defaultLabel: "Health History", icon: LineChart },
-  { to: "/app/reports", key: "nav.reports", defaultLabel: "Medical Reports", icon: FileText },
-  { to: "/app/risk", key: "nav.risk", defaultLabel: "Risk & Patterns", icon: Activity },
-  { to: "/app/assistant", key: "nav.assistant", defaultLabel: "AI Assistant", icon: Bot },
-  { to: "/app/goals", key: "nav.goals", defaultLabel: "Goals", icon: Target },
-  { to: "/app/notifications", key: "nav.notifications", defaultLabel: "Notifications", icon: Bell },
   {
-    to: "/app/specialist",
-    key: "nav.specialist",
-    defaultLabel: "Specialist Guidance",
-    icon: Stethoscope,
+    titleKey: "nav.sectionIntelligence",
+    defaultTitle: "Health Records & Insights",
+    items: [
+      { to: "/app/reports", key: "nav.reports", defaultLabel: "Medical Reports", icon: FileText },
+      { to: "/app/risk", key: "nav.risk", defaultLabel: "Risk & Patterns", icon: Activity },
+      { to: "/app/history", key: "nav.history", defaultLabel: "Health History", icon: LineChart },
+      { to: "/app/goals", key: "nav.goals", defaultLabel: "Goals", icon: Target },
+    ],
   },
-  { to: "/app/guide", key: "nav.guide", defaultLabel: "Help & Guide", icon: Compass },
-  { to: "/app/support", key: "nav.support", defaultLabel: "Support", icon: LifeBuoy },
-  { to: "/app/settings", key: "nav.settings", defaultLabel: "Profile & Privacy", icon: Settings },
+  {
+    titleKey: "nav.sectionSystem",
+    defaultTitle: "Care & Settings",
+    items: [
+      {
+        to: "/app/specialist",
+        key: "nav.specialist",
+        defaultLabel: "Specialist Guidance",
+        icon: Stethoscope,
+      },
+      { to: "/app/guide", key: "nav.guide", defaultLabel: "Help & Guide", icon: Compass },
+      { to: "/app/notifications", key: "nav.notifications", defaultLabel: "Notifications", icon: Bell },
+      { to: "/app/support", key: "nav.support", defaultLabel: "Support", icon: LifeBuoy },
+      { to: "/app/settings", key: "nav.settings", defaultLabel: "Profile & Privacy", icon: Settings },
+    ],
+  },
 ] as const;
+
+export const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -83,27 +103,36 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const nav = (
-    <nav className="flex flex-col gap-1 p-3">
-      {NAV_ITEMS.map(({ to, key, defaultLabel, icon: Icon }) => {
-        const active = path === to;
-        const label = t(key) || defaultLabel;
-        return (
-          <Link
-            key={to}
-            to={to}
-            onClick={() => setOpen(false)}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-              active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-            )}
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="truncate">{label}</span>
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-4 p-3">
+      {NAV_SECTIONS.map((section) => (
+        <div key={section.titleKey} className="space-y-1">
+          <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            {t(section.titleKey) || section.defaultTitle}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {section.items.map(({ to, key, defaultLabel, icon: Icon }) => {
+              const active = path === to;
+              const label = t(key) || defaultLabel;
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 

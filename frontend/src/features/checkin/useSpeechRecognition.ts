@@ -112,9 +112,35 @@ export function normalizeSpeechTranscript(rawText: string, preferredLanguage = "
     return cleaned;
   }
 
-  // Apply health-specific semantic improvements for English
+  // Apply health-specific semantic improvements based on language
   let result = cleaned;
-  if (normalizedLanguage === "en-IN" || preferredLanguage === "en-IN") {
+  if (preferredLanguage.startsWith("ta") || normalizedLanguage.startsWith("ta")) {
+    result = result
+      .replace(/\biniku\b|\bindru\b/gi, "இன்று")
+      .replace(/\bhours?\b|\bhrs?\b/gi, "மணி நேரம்")
+      .replace(/\bthoonginen\b|\bthoongina\b|\bslept\b/gi, "தூங்கினேன்")
+      .replace(/\bthookam\b/gi, "தூக்கம்")
+      .replace(/\bthanni\b|\bthanneer\b/gi, "தண்ணீர்")
+      .replace(/\bkudichen\b|\bkudithen\b/gi, "குடித்தேன்")
+      .replace(/\bwalk\s*paninen\b|\bnadanthen\b/gi, "நடைப்பயிற்சி செய்தேன்")
+      .replace(/\bmins?\b|\bminutes?\b/gi, "நிமிடம்")
+      .replace(/\bromba\b/gi, "மிகவும்")
+      .replace(/\btired-?ah\s*iruku\b|\bsorva\s*iruku\b/gi, "சோர்வாக உணர்கிறேன்")
+      .replace(/\bnalla\s*iruken\b/gi, "நன்றாக உணர்கிறேன்")
+      .replace(/\bthalavali\b/gi, "தலைவலி")
+      .replace(/\bkaichal\b/gi, "காய்ச்சல்");
+  } else {
+    result = result
+      .replace(/\biniku\b|\bindru\b|இன்று/gi, "Today")
+      .replace(/\bmani\s*neram\s*thoonginen\b|\bhours\s*thoonginen\b|மணி\s*நேரம்\s*தூங்கினேன்/gi, "hours of sleep")
+      .replace(/\bthoonginen\b|\bthoongina\b|தூங்கினேன்/gi, "slept")
+      .replace(/\bthookam\b|தூக்கம்/gi, "sleep")
+      .replace(/\bthanni\b|\bthanneer\b|தண்ணீர்/gi, "water")
+      .replace(/\bkudichen\b|\bkudithen\b|குடித்தேன்/gi, "drank")
+      .replace(/\bwalk\s*paninen\b|\bnadanthen\b|நடந்தேன்/gi, "walked")
+      .replace(/\bnimisham\b|\bnimudam\b|நிமிடம்/gi, "minutes")
+      .replace(/\btired-?ah\s*iruku\b|\bsorva\s*iruku\b|சோர்வாக/gi, "feeling tired")
+      .replace(/\bnalla\s*iruken\b|நன்றாக/gi, "feeling good");
     result = applyHealthSemanticImprovements(result);
   }
 
@@ -125,6 +151,30 @@ export function normalizeSpeechTranscript(rawText: string, preferredLanguage = "
   );
 
   return result;
+}
+
+export async function improveTranscriptWithLanguage(
+  text: string,
+  targetLanguage = "en",
+): Promise<string> {
+  const clean = text.trim();
+  if (!clean) return "";
+  try {
+    const res = await fetch("/api/ai/improve-transcript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: clean, language: targetLanguage }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.ok && typeof data.improvedText === "string") {
+        return data.improvedText;
+      }
+    }
+  } catch {
+    // Fall back to local normalizeSpeechTranscript below
+  }
+  return normalizeSpeechTranscript(clean, targetLanguage);
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -179,6 +229,8 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState("en-IN");
 
+  const isListeningRef = useRef(false);
+
   const updateLanguageFromText = useCallback(
     (rawText: string) => {
       const detected = detectSpeechLanguage(rawText, language);
@@ -201,6 +253,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     );
 
   const stopListening = useCallback(() => {
+    isListeningRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -213,6 +266,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   }, []);
 
   const reset = useCallback(() => {
+    isListeningRef.current = false;
     stopListening();
     setTranscript("");
     setInterimTranscript("");
@@ -252,6 +306,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       instance.lang = language;
 
       instance.onstart = () => {
+        isListeningRef.current = true;
         setIsListening(true);
         setError(null);
       };
@@ -289,8 +344,13 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
       instance.onerror = (event: { error: string; message?: string }) => {
         if (event.error === "no-speech") {
+          // No-speech event is common in pauses; if user is still recording, keep going without throwing fatal error
+          if (isListeningRef.current) {
+            return;
+          }
           setError("No speech was detected. Please try again or type naturally.");
         } else if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          isListeningRef.current = false;
           setError(
             "Microphone permission was denied. Please allow microphone access or type naturally.",
           );
@@ -300,30 +360,49 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
             networkErrorRetryCountRef.current += 1;
             retryTimeoutRef.current = window.setTimeout(
               () => {
-                instance.start();
+                if (isListeningRef.current) {
+                  try {
+                    instance.start();
+                  } catch {
+                    // Ignore start error
+                  }
+                }
               },
               1000 + networkErrorRetryCountRef.current * 500,
             );
             return;
           } else {
+            isListeningRef.current = false;
             setError(
               "Speech recognition service is unavailable. You can type naturally or use Quick Check-in.",
             );
           }
         } else {
+          isListeningRef.current = false;
           setError(`Voice input error: ${event.error}. You can type naturally instead.`);
         }
         setIsListening(false);
       };
 
       instance.onend = () => {
+        // Continuous extended recording: if listening is still requested, automatically restart recognition!
+        if (isListeningRef.current) {
+          try {
+            instance.start();
+            return;
+          } catch {
+            // Already started or restarting
+          }
+        }
         setIsListening(false);
         setInterimTranscript("");
       };
 
       recognitionRef.current = instance;
+      isListeningRef.current = true;
       instance.start();
     } catch {
+      isListeningRef.current = false;
       setError(
         "Could not start speech recognition. Please check microphone permissions or type naturally.",
       );
