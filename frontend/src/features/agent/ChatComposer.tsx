@@ -107,7 +107,7 @@ export function ChatComposer({
                 type="button"
                 onClick={() => setWebSearchEnabled((prev) => !prev)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+                  "touch-press inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer min-h-[36px]",
                   webSearchEnabled
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "border border-border/80 bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -137,10 +137,10 @@ export function ChatComposer({
               type="submit"
               size="icon"
               disabled={busy || !input.trim() || !online}
-              className="size-8 rounded-full transition-transform active:scale-95 shrink-0"
+              className="touch-press size-10 rounded-full shadow-xs shrink-0 flex items-center justify-center"
               aria-label="Send message"
             >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-5" />}
             </Button>
           </div>
         </form>

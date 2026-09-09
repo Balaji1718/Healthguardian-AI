@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, FileText, Loader2, ScanLine, Trash2, Upload } from "lucide-react";
+import { Camera, CheckCircle2, FileText, Loader2, ScanLine, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -67,6 +67,8 @@ export function ReportsPage() {
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useReports(uid);
   const [file, setFile] = useState<File | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [meta, setMeta] = useState({
     reportTitle: "",
     reportType: "blood_test",
@@ -257,29 +259,100 @@ export function ReportsPage() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="file">{t("reports.uploadBoxHint")}</Label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">{t("reports.uploadBoxTitle") || "Upload Report"}</Label>
             <ContextualHelp content={t("reports.contextHelp")} />
           </div>
-          <Input
-            id="file"
+
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const selected = e.target.files?.[0];
+              if (selected) setFile(selected);
+            }}
+          />
+          <input
+            ref={fileInputRef}
             type="file"
             accept={ALLOWED_MIME.join(",")}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="hidden"
+            onChange={(e) => {
+              const selected = e.target.files?.[0];
+              if (selected) setFile(selected);
+            }}
           />
+
+          {!file ? (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5 text-primary transition-colors hover:bg-primary/10 hover:border-primary"
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                  <Camera className="size-5" />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-semibold truncate">{t("reports.takePhoto") || "Take Photo of Report"}</p>
+                  <p className="text-xs text-muted-foreground truncate">Direct mobile camera scan</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card p-3.5 transition-colors hover:bg-muted/50 hover:border-primary/50"
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground shrink-0">
+                  <Upload className="size-5" />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-sm font-semibold truncate">{t("reports.chooseFile") || "Upload PDF or File"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{t("reports.uploadBoxHint")}</p>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  {file.type.startsWith("image/") ? <Camera className="size-5" /> : <FileText className="size-5" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB · {file.type.split("/")[1]?.toUpperCase() || "FILE"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+                onClick={() => setFile(null)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          )}
         </div>
 
         {progress !== null && (
-          <div>
-            <p className="mb-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-              <ScanLine className="size-4" /> {t("reports.readingProgress", { progress })}
+          <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
+            <p className="flex items-center gap-2 text-xs sm:text-sm font-medium text-primary">
+              <ScanLine className="size-4 animate-pulse" /> {t("reports.readingProgress", { progress })}
             </p>
-            <Progress value={progress} />
+            <Progress value={progress} className="h-2" />
           </div>
         )}
 
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || !file} className="w-full sm:w-auto min-h-[48px] touch-press text-base sm:text-sm">
           {busy ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
           ) : (
@@ -290,63 +363,86 @@ export function ReportsPage() {
       </form>
 
       {candidates.length > 0 && (
-        <section className="surface mt-6 p-6">
-          <h2 className="font-medium">{t("reports.verifyModalTitle")}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t("reports.verifyModalDesc")}</p>
+        <section className="surface mt-6 p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-base sm:text-lg">{t("reports.verifyModalTitle")}</h2>
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{t("reports.verifyModalDesc")}</p>
+            </div>
+            <Badge variant="outline" className="shrink-0">{candidates.length} values</Badge>
+          </div>
           <div className="mt-4 space-y-3">
             {candidates.map((c, i) => (
               <div
                 key={i}
-                className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_auto]"
+                className="rounded-xl border bg-card p-3 shadow-xs space-y-2.5 sm:space-y-0 sm:grid sm:grid-cols-[2fr_1fr_1fr_auto] sm:gap-2 sm:items-center"
               >
-                <Input
-                  aria-label="Test name"
-                  value={c.testName}
-                  onChange={(e) =>
-                    setCandidates((cur) =>
-                      cur.map((x, j) => (j === i ? { ...x, testName: e.target.value } : x)),
-                    )
-                  }
-                />
-                <Input
-                  aria-label="Value"
-                  value={c.resultValue}
-                  onChange={(e) =>
-                    setCandidates((cur) =>
-                      cur.map((x, j) =>
-                        j === i
-                          ? {
-                              ...x,
-                              resultValue: e.target.value,
-                              numericValue: Number.parseFloat(e.target.value) || null,
-                            }
-                          : x,
-                      ),
-                    )
-                  }
-                />
-                <Input
-                  aria-label="Unit"
-                  value={c.unit ?? ""}
-                  onChange={(e) =>
-                    setCandidates((cur) =>
-                      cur.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)),
-                    )
-                  }
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Remove value"
-                  onClick={() => setCandidates((cur) => cur.filter((_, j) => j !== i))}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground sm:hidden">Test Name</Label>
+                  <Input
+                    aria-label="Test name"
+                    value={c.testName}
+                    className="h-10 text-sm font-medium"
+                    onChange={(e) =>
+                      setCandidates((cur) =>
+                        cur.map((x, j) => (j === i ? { ...x, testName: e.target.value } : x)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:contents">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground sm:hidden">Value</Label>
+                    <Input
+                      aria-label="Value"
+                      value={c.resultValue}
+                      className="h-10 text-sm"
+                      onChange={(e) =>
+                        setCandidates((cur) =>
+                          cur.map((x, j) =>
+                            j === i
+                              ? {
+                                  ...x,
+                                  resultValue: e.target.value,
+                                  numericValue: Number.parseFloat(e.target.value) || null,
+                                }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground sm:hidden">Unit</Label>
+                    <Input
+                      aria-label="Unit"
+                      value={c.unit ?? ""}
+                      className="h-10 text-sm"
+                      onChange={(e) =>
+                        setCandidates((cur) =>
+                          cur.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end sm:block">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-full sm:w-10 text-destructive hover:bg-destructive/10"
+                    aria-label="Remove value"
+                    onClick={() => setCandidates((cur) => cur.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="size-4 mr-1 sm:mr-0" />
+                    <span className="sm:hidden text-xs">{t("common.delete")}</span>
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
-          <Button className="mt-4" onClick={() => void confirmAll()} disabled={busy}>
+          <Button className="mt-4 w-full sm:w-auto min-h-[48px] touch-press" onClick={() => void confirmAll()} disabled={busy}>
             <CheckCircle2 className="mr-2 size-4" /> {t("reports.saveAllConfirmed")} (
             {candidates.length})
           </Button>
@@ -363,26 +459,33 @@ export function ReportsPage() {
         ) : (
           <ul className="space-y-2">
             {(data ?? []).map((r) => (
-              <li key={r.id} className="surface flex flex-wrap items-center gap-3 p-4">
-                <FileText className="size-5 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{r.reportTitle}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {toDate(r.reportDate)?.toLocaleDateString() ?? "—"} ·{" "}
-                    {formatReportType(r.reportType, t)}
-                  </p>
+              <li key={r.id} className="surface flex flex-col sm:flex-row sm:items-center gap-3 p-4">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                    <FileText className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-sm sm:text-base">{r.reportTitle}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {toDate(r.reportDate)?.toLocaleDateString() ?? "—"} ·{" "}
+                      {formatReportType(r.reportType, t)}
+                    </p>
+                  </div>
+                  <Badge variant={r.verificationStatus === "verified" ? "default" : "secondary"} className="shrink-0 text-xs">
+                    {r.verificationStatus === "verified"
+                      ? t("reports.statusVerified")
+                      : t("reports.statusPending")}
+                  </Badge>
                 </div>
-                <Badge variant={r.verificationStatus === "verified" ? "default" : "secondary"}>
-                  {r.verificationStatus === "verified"
-                    ? t("reports.statusVerified")
-                    : t("reports.statusPending")}
-                </Badge>
-                <Button variant="outline" size="sm" onClick={() => void openLocal(r)}>
-                  {t("preview.previewBtn") || "Open"}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => void removeReport(r)}>
-                  {t("common.delete")}
-                </Button>
+
+                <div className="flex items-center justify-end gap-2 border-t pt-2 sm:border-t-0 sm:pt-0">
+                  <Button variant="outline" size="sm" className="min-h-[36px] flex-1 sm:flex-none text-xs" onClick={() => void openLocal(r)}>
+                    {t("preview.previewBtn") || "Open"}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="min-h-[36px] text-destructive hover:bg-destructive/10 text-xs" onClick={() => void removeReport(r)}>
+                    {t("common.delete")}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -401,8 +504,28 @@ function VerifiedValues({ uid, reportId }: { uid: string | null; reportId: strin
   const verified = (data ?? []).filter((r) => r.userVerified);
   if (!reportId || verified.length === 0) return null;
   return (
-    <section className="surface mt-6 overflow-x-auto">
-      <table className="w-full text-sm">
+    <section className="surface mt-6 p-4 sm:p-0 sm:overflow-x-auto">
+      <div className="sm:hidden space-y-2.5">
+        <h3 className="font-semibold text-sm text-muted-foreground mb-2">Verified Biomarkers</h3>
+        {verified.map((r) => (
+          <div key={r.id} className="rounded-xl border bg-card p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-sm">{r.testName}</p>
+              {r.flag && (
+                <Badge variant={r.flag === "high" ? "destructive" : r.flag === "low" ? "secondary" : "outline"} className="capitalize text-[10px]">
+                  {r.flag}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+              <span>Value: <strong className="text-foreground text-sm">{r.resultValue} {r.unit ?? ""}</strong></span>
+              <span>Ref: {r.referenceLow != null && r.referenceHigh != null ? `${r.referenceLow}–${r.referenceHigh}` : (r.referenceText ?? "—")}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <table className="hidden sm:table w-full text-sm">
         <thead className="border-b bg-muted/50 text-left">
           <tr>
             <th className="px-4 py-2.5 font-medium">Test</th>

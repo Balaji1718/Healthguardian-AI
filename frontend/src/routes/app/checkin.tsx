@@ -579,22 +579,48 @@ function Checkin() {
             />
           </div>
 
+          {/* Wellbeing / Mood Selector */}
+          <section className="surface space-y-3 p-4 sm:p-6 rounded-2xl border">
+            <h2 className="font-semibold text-sm text-foreground">{t("dashboard.wellbeing") || "How are you feeling today?"}</h2>
+            <div className="flex flex-wrap gap-2">
+              {WELLBEING_PILLS.map((pill) => {
+                const active = form.wellbeing === pill.value;
+                return (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() => setField("wellbeing", active ? "" : pill.value)}
+                    className={cn(
+                      "touch-press flex min-h-[44px] items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-medium transition-all cursor-pointer",
+                      active
+                        ? "border-primary bg-primary/10 text-primary shadow-xs ring-2 ring-primary/20"
+                        : "hover:bg-muted text-muted-foreground bg-card",
+                    )}
+                  >
+                    <span className="text-base">{pill.icon}</span>
+                    <span>{pill.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
           {/* Daily Habits */}
-          <section className="surface space-y-4 p-6 rounded-2xl border">
+          <section className="surface space-y-4 p-4 sm:p-6 rounded-2xl border">
             <h2 className="font-semibold text-sm text-foreground">Core Daily Habits</h2>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="sleepHours">Sleep (hours)</Label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("sleepHours", -0.5, 0, 24)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Minus className="size-3.5" />
+                    <Minus className="size-4" />
                   </Button>
                   <Input
                     id="sleepHours"
@@ -605,31 +631,31 @@ function Checkin() {
                     placeholder="e.g. 7.5"
                     value={form.sleepHours}
                     onChange={(e) => setField("sleepHours", e.target.value)}
-                    className="text-center text-xs"
+                    className="h-10 text-center text-sm font-semibold"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("sleepHours", 0.5, 0, 24)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Plus className="size-3.5" />
+                    <Plus className="size-4" />
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="waterGlasses">Water (glasses)</Label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("waterGlasses", -1, 0, 30)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Minus className="size-3.5" />
+                    <Minus className="size-4" />
                   </Button>
                   <Input
                     id="waterGlasses"
@@ -639,31 +665,31 @@ function Checkin() {
                     placeholder="e.g. 8"
                     value={form.waterGlasses}
                     onChange={(e) => setField("waterGlasses", e.target.value)}
-                    className="text-center text-xs"
+                    className="h-10 text-center text-sm font-semibold"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("waterGlasses", 1, 0, 30)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Plus className="size-3.5" />
+                    <Plus className="size-4" />
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="exerciseMinutes">Exercise (min)</Label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("exerciseMinutes", -5, 0, 360)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Minus className="size-3.5" />
+                    <Minus className="size-4" />
                   </Button>
                   <Input
                     id="exerciseMinutes"
@@ -673,16 +699,16 @@ function Checkin() {
                     placeholder="e.g. 30"
                     value={form.exerciseMinutes}
                     onChange={(e) => setField("exerciseMinutes", e.target.value)}
-                    className="text-center text-xs"
+                    className="h-10 text-center text-sm font-semibold"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     onClick={() => adjustNumeric("exerciseMinutes", 5, 0, 360)}
-                    className="size-8"
+                    className="touch-press size-10 rounded-xl"
                   >
-                    <Plus className="size-3.5" />
+                    <Plus className="size-4" />
                   </Button>
                 </div>
               </div>
@@ -771,7 +797,7 @@ function Checkin() {
           {/* Symptoms */}
           <section className="surface space-y-4 p-6 rounded-2xl border">
             <h2 className="font-semibold text-sm text-foreground">{t("checkin.symptoms")}</h2>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {COMMON_SYMPTOMS.map((s) => {
                 const active = symptoms.includes(s);
                 return (
@@ -780,10 +806,10 @@ function Checkin() {
                     type="button"
                     onClick={() => toggleSymptom(s)}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs capitalize transition-colors cursor-pointer",
+                      "touch-press flex min-h-[36px] items-center rounded-full border px-3.5 py-1.5 text-xs capitalize transition-colors cursor-pointer",
                       active
-                        ? "border-destructive bg-destructive/10 text-destructive font-medium"
-                        : "hover:bg-muted text-muted-foreground",
+                        ? "border-destructive bg-destructive/10 text-destructive font-medium shadow-xs"
+                        : "hover:bg-muted text-muted-foreground bg-card",
                     )}
                   >
                     {formatSymptom(s, t)}
@@ -794,7 +820,7 @@ function Checkin() {
           </section>
 
           {/* Notes */}
-          <section className="surface space-y-4 p-6 rounded-2xl border">
+          <section className="surface space-y-4 p-4 sm:p-6 rounded-2xl border">
             <h2 className="font-semibold text-sm text-foreground">{t("checkin.notes")}</h2>
             <Textarea
               id="notes"
@@ -807,18 +833,18 @@ function Checkin() {
           </section>
 
           {/* Action Row */}
-          <div className="flex items-center justify-between gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => setMode("composer")}
-              className="text-xs"
+              className="touch-press text-xs h-10 w-full sm:w-auto"
             >
               Cancel
             </Button>
 
-            <Button type="submit" className="gap-1.5 font-semibold shadow-xs text-xs">
+            <Button type="submit" className="touch-press gap-2 font-semibold shadow-xs text-sm min-h-[48px] px-6 w-full sm:w-auto">
               <ShieldCheck className="size-4" /> Review & Confirm →
             </Button>
           </div>

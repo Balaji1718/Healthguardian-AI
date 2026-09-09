@@ -222,13 +222,13 @@ function Assistant() {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-6rem)] flex-col justify-between">
+    <div className="flex min-h-[calc(100dvh-10rem)] flex-col justify-between">
       {/* Top Header */}
-      <div className="mx-auto w-full max-w-3xl px-2 sm:px-4 pt-1 pb-4">
+      <div className="mx-auto w-full max-w-3xl px-2 sm:px-4 pt-1 pb-3">
         <div className="flex items-center justify-between border-b pb-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
                 HealthGuardian AI
               </h1>
               <Badge
@@ -260,7 +260,7 @@ function Assistant() {
         <div className="mx-auto max-w-3xl space-y-5">
           {/* Empty State: Welcoming Screen with Starter Prompts */}
           {messages.length === 0 && (
-            <div className="my-auto py-8 sm:py-12 space-y-6">
+            <div className="my-auto py-6 sm:py-12 space-y-5">
               <div className="text-center space-y-2 max-w-md mx-auto">
                 <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-xs">
                   <Bot className="size-6" />
@@ -273,19 +273,19 @@ function Assistant() {
                 </p>
               </div>
 
-              {/* Starter Chips Grid */}
-              <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
+              {/* Starter Chips: Swipeable Carousel on Mobile, Grid on Desktop */}
+              <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar gap-2.5 -mx-2 px-2 pb-2 sm:grid sm:grid-cols-2 sm:mx-0 sm:px-0 sm:pb-0 pt-2">
                 {getStarterPrompts(t).map((item, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => handleSelectStarter(item)}
-                    className="flex items-start gap-3 rounded-xl border bg-card/70 p-3 text-left shadow-xs hover:border-primary/50 hover:bg-card transition-all cursor-pointer group"
+                    className="touch-press flex w-[78vw] max-w-[290px] shrink-0 snap-center sm:w-auto items-start gap-3 rounded-2xl border bg-card/70 p-3.5 text-left shadow-xs hover:border-primary/50 hover:bg-card transition-all cursor-pointer group"
                   >
-                    <span className="text-lg shrink-0 pt-0.5">{item.icon}</span>
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-xs text-foreground group-hover:text-primary transition-colors">
+                    <span className="text-xl shrink-0 pt-0.5">{item.icon}</span>
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 justify-between">
+                        <span className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors">
                           {item.label}
                         </span>
                         {item.enableWebSearch && (
@@ -395,6 +395,25 @@ function Assistant() {
           <div ref={endRef} />
         </div>
       </div>
+
+      {/* Quick Suggestion Chips on mobile & desktop */}
+      {messages.length > 0 && !busy && (
+        <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
+          <div className="flex items-center gap-1.5 overflow-x-auto snap-x no-scrollbar py-1">
+            {getStarterPrompts(t).slice(0, 4).map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSelectStarter(item)}
+                className="touch-press inline-flex shrink-0 snap-start items-center gap-1 rounded-full border bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Sticky Bottom Chat Composer */}
       <ChatComposer

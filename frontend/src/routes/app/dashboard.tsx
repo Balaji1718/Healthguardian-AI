@@ -333,24 +333,59 @@ function Dashboard() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          <section className="surface p-6 md:col-span-2">
+        <div className="space-y-4">
+          {/* Today's Check-in Mobile Hero Banner */}
+          {!doneToday ? (
+            <div className="surface rounded-2xl p-4 sm:p-5 border-primary/30 bg-gradient-to-r from-primary/15 via-primary/5 to-transparent flex items-center justify-between gap-3 shadow-xs">
+              <div className="space-y-1 min-w-0">
+                <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-primary animate-ping" />
+                  {t("dashboard.noCheckinToday") || "Today's check-in pending"}
+                </span>
+                <p className="text-xs text-muted-foreground truncate">
+                  Log your sleep, water, and vitals in 60s
+                </p>
+              </div>
+              <Button asChild size="sm" className="shrink-0 gap-1.5 shadow-sm touch-press font-semibold text-xs px-3.5">
+                <Link to="/app/checkin">
+                  <Mic className="size-3.5" />
+                  <span>{t("dashboard.logNow")}</span>
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+              <span className="flex items-center gap-2 font-medium">
+                <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>Today's check-in recorded!</span>
+              </span>
+              <Link to="/app/checkin" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline touch-press">
+                {t("dashboard.updateToday")} →
+              </Link>
+            </div>
+          )}
+
+          {/* General Health Score Card */}
+          <section className="surface p-5 sm:p-6">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
+              <h2 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 {t("dashboard.scoreTitle")}
               </h2>
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="font-semibold text-xs">
                 {t(`dashboard.bands.${score.band}`) || SCORE_BANDS[score.band]}
               </Badge>
             </div>
-            <p className="mt-2 text-5xl font-semibold tracking-tight">{score.score}</p>
-            <Progress value={score.score} className="mt-4" />
-            <p className="mt-3 text-xs text-muted-foreground">{t("dashboard.scoreDisclaimer")}</p>
-            <ul className="mt-4 space-y-1.5 text-sm">
-              {score.contributions.slice(0, 5).map((c, i) => (
+            <div className="mt-2 flex items-baseline gap-3">
+              <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground">{score.score}</p>
+              <span className="text-xs text-muted-foreground font-medium">/ 100</span>
+            </div>
+            <Progress value={score.score} className="mt-3 h-2.5" />
+            <p className="mt-2.5 text-[11px] text-muted-foreground leading-relaxed">{t("dashboard.scoreDisclaimer")}</p>
+            <ul className="mt-3.5 space-y-1.5 text-xs">
+              {score.contributions.slice(0, 3).map((c, i) => (
                 <li key={i} className="flex items-start justify-between gap-3">
                   <span className="text-muted-foreground">{formatScoreContribution(c, t)}</span>
-                  <span className={c.delta < 0 ? "text-destructive" : "text-success"}>
+                  <span className={`font-semibold ${c.delta < 0 ? "text-destructive" : "text-success"}`}>
                     {c.delta > 0 ? `+${c.delta}` : c.delta}
                   </span>
                 </li>
@@ -358,112 +393,163 @@ function Dashboard() {
             </ul>
           </section>
 
-          <section className="surface p-6">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              {t("dashboard.recentEntry")}
-            </h2>
-            <p className="mt-1 text-sm">{last ? toDate(last.date)?.toLocaleDateString() : "—"}</p>
-            <dl className="mt-4 space-y-3 text-sm">
-              <Metric
-                icon={Moon}
-                label={t("dashboard.sleep")}
-                value={last?.sleepHours != null ? `${last.sleepHours} h` : t("dashboard.notLogged")}
-              />
-              <Metric
-                icon={Droplets}
-                label={t("dashboard.water")}
-                value={
-                  last?.waterGlasses != null
-                    ? `${last.waterGlasses} ${t("units.glasses")}`
-                    : t("dashboard.notLogged")
-                }
-              />
-              <Metric
-                icon={Footprints}
-                label={t("dashboard.exercise")}
-                value={
-                  last?.exerciseMinutes != null
-                    ? `${last.exerciseMinutes} ${t("units.mins")}`
-                    : t("dashboard.notLogged")
-                }
-              />
-            </dl>
-          </section>
-
-          <section className="surface p-6 md:col-span-2">
-            <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Activity className="size-4" /> {t("dashboard.patternsDetected")}
-              </h2>
-              <Link to="/app/risk" className="text-sm text-primary hover:underline">
-                {t("dashboard.viewAll")}
-              </Link>
+          {/* Swipeable Daily Habits Carousel (Mobile-Native Thumb Zone) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs px-0.5">
+              <span className="font-bold text-foreground uppercase tracking-wider text-[11px]">
+                {t("dashboard.recentEntry")}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {last ? toDate(last.date)?.toLocaleDateString() : "—"}
+              </span>
             </div>
-            {ENABLE_ADAPTIVE_V2 && adaptiveInsights.length > 0 && (
-              <div className="mb-4 space-y-2 mt-3">
-                {adaptiveInsights.slice(0, 2).map((insight, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-3 rounded-lg border-l-4 border-primary bg-muted/40 px-3 py-2.5 text-sm text-foreground font-medium"
-                  >
-                    <span>{formatAdaptiveSignal(insight, t)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {patterns.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">{t("dashboard.noPatterns")}</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {patterns.slice(0, 4).map((p) => (
-                  <li
-                    key={p.factor}
-                    className="flex items-start gap-3 rounded-lg bg-muted/60 px-3 py-2 text-sm"
-                  >
-                    <span
-                      className={
-                        p.severity === 2
-                          ? "mt-1.5 size-2 shrink-0 rounded-full bg-destructive"
-                          : "mt-1.5 size-2 shrink-0 rounded-full bg-warning"
-                      }
-                    />
-                    <span>{formatPatternDetail(p, t)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
 
-          <section className="surface p-6">
-            <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Target className="size-4" /> {t("dashboard.activeGoals")}
-            </h2>
-            {(goals.data ?? []).filter((g) => g.status === "active").length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">{t("dashboard.noActiveGoals")}</p>
-            ) : (
-              <ul className="mt-3 space-y-3">
-                {(goals.data ?? [])
-                  .filter((g) => g.status === "active")
-                  .slice(0, 3)
-                  .map((g) => (
-                    <li key={g.id}>
-                      <p className="text-sm font-medium">{formatGoalTitle(g.title, t)}</p>
-                      <Progress
-                        className="mt-1.5"
-                        value={
-                          g.targetValue ? Math.min(100, (g.progressValue / g.targetValue) * 100) : 0
+            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-0.5 no-scrollbar touch-scroll snap-x snap-mandatory -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
+              {/* Sleep Card */}
+              <div className="surface min-w-[140px] flex-1 p-3.5 rounded-2xl flex flex-col justify-between space-y-2 snap-start border touch-press">
+                <div className="flex items-center justify-between">
+                  <div className="size-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                    <Moon className="size-4" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium">Goal 8h</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">
+                    {last?.sleepHours != null ? `${last.sleepHours} h` : "—"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.sleep")}</p>
+                </div>
+              </div>
+
+              {/* Water Card */}
+              <div className="surface min-w-[140px] flex-1 p-3.5 rounded-2xl flex flex-col justify-between space-y-2 snap-start border touch-press">
+                <div className="flex items-center justify-between">
+                  <div className="size-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <Droplets className="size-4" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium">Goal 8 gl</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">
+                    {last?.waterGlasses != null ? `${last.waterGlasses} gl` : "—"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.water")}</p>
+                </div>
+              </div>
+
+              {/* Activity Card */}
+              <div className="surface min-w-[140px] flex-1 p-3.5 rounded-2xl flex flex-col justify-between space-y-2 snap-start border touch-press">
+                <div className="flex items-center justify-between">
+                  <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <Footprints className="size-4" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium">Goal 30m</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">
+                    {last?.exerciseMinutes != null ? `${last.exerciseMinutes} m` : "—"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.exercise")}</p>
+                </div>
+              </div>
+
+              {/* Vitals / BP Card */}
+              <div className="surface min-w-[140px] flex-1 p-3.5 rounded-2xl flex flex-col justify-between space-y-2 snap-start border touch-press">
+                <div className="flex items-center justify-between">
+                  <div className="size-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
+                    <Heart className="size-4" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium">Target &lt;120</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">
+                    {last?.systolicBP != null ? `${last.systolicBP}/${last.diastolicBP || 80}` : "—"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium">Blood Pressure</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Patterns & Goals Grid */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Patterns Detected */}
+            <section className="surface p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-1.5 text-xs font-bold text-foreground uppercase tracking-wider">
+                  <Activity className="size-3.5 text-primary" /> {t("dashboard.patternsDetected")}
+                </h2>
+                <Link to="/app/risk" className="text-xs text-primary font-medium hover:underline touch-press">
+                  {t("dashboard.viewAll")}
+                </Link>
+              </div>
+              {ENABLE_ADAPTIVE_V2 && adaptiveInsights.length > 0 && (
+                <div className="space-y-1.5">
+                  {adaptiveInsights.slice(0, 2).map((insight, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2.5 rounded-lg border-l-3 border-primary bg-primary/5 px-2.5 py-2 text-xs text-foreground font-medium"
+                    >
+                      <span>{formatAdaptiveSignal(insight, t)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {patterns.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("dashboard.noPatterns")}</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {patterns.slice(0, 3).map((p) => (
+                    <li
+                      key={p.factor}
+                      className="flex items-start gap-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-xs"
+                    >
+                      <span
+                        className={
+                          p.severity === 2
+                            ? "mt-1 size-2 shrink-0 rounded-full bg-destructive"
+                            : "mt-1 size-2 shrink-0 rounded-full bg-warning"
                         }
                       />
+                      <span>{formatPatternDetail(p, t)}</span>
                     </li>
                   ))}
-              </ul>
-            )}
-            <Button asChild variant="ghost" size="sm" className="mt-4 px-0">
-              <Link to="/app/goals">
-                {t("dashboard.manageGoals")} <ArrowRight className="ml-1 size-4" />
-              </Link>
-            </Button>
-          </section>
+                </ul>
+              )}
+            </section>
+
+            {/* Active Goals */}
+            <section className="surface p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-1.5 text-xs font-bold text-foreground uppercase tracking-wider">
+                  <Target className="size-3.5 text-primary" /> {t("dashboard.activeGoals")}
+                </h2>
+                <Link to="/app/goals" className="text-xs text-primary font-medium hover:underline touch-press">
+                  {t("dashboard.manageGoals")} →
+                </Link>
+              </div>
+              {(goals.data ?? []).filter((g) => g.status === "active").length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("dashboard.noActiveGoals")}</p>
+              ) : (
+                <ul className="space-y-2.5">
+                  {(goals.data ?? [])
+                    .filter((g) => g.status === "active")
+                    .slice(0, 2)
+                    .map((g) => (
+                      <li key={g.id} className="space-y-1">
+                        <p className="text-xs font-medium truncate">{formatGoalTitle(g.title, t)}</p>
+                        <Progress
+                          className="h-1.5"
+                          value={
+                            g.targetValue ? Math.min(100, (g.progressValue / g.targetValue) * 100) : 0
+                          }
+                        />
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </section>
+          </div>
         </div>
       )}
 

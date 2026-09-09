@@ -293,14 +293,14 @@ export function CaptureReview({
                     <button
                       type="button"
                       onClick={() => toggleField(item.id)}
-                      className="size-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1"
+                      className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors ml-1"
                       title={isIncluded ? t("review.excludeField") : t("review.includeField")}
                       aria-label={`${isIncluded ? "Exclude" : "Include"} ${item.label}`}
                     >
                       {isIncluded ? (
-                        <Check className="size-3 text-primary" />
+                        <Check className="size-4 text-primary" />
                       ) : (
-                        <X className="size-3" />
+                        <X className="size-4" />
                       )}
                     </button>
                   )}
@@ -423,32 +423,31 @@ export function CaptureReview({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onEdit}
           disabled={busy}
-          className="text-xs h-9 gap-1.5 text-muted-foreground hover:text-foreground"
+          className="touch-press text-xs h-10 gap-1.5 text-muted-foreground hover:text-foreground w-full sm:w-auto"
         >
-          <Edit3 className="size-3.5" /> {t("review.editValues")}
+          <Edit3 className="size-4" /> {t("review.editValues")}
         </Button>
 
         <Button
           type="button"
-          size="sm"
           onClick={() => void handleConfirmAction()}
           disabled={busy}
-          className="text-xs h-9 px-4 gap-1.5 font-medium shadow-xs"
+          className="touch-press text-sm min-h-[48px] sm:min-h-[40px] px-6 gap-2 font-semibold shadow-xs bg-primary text-primary-foreground w-full sm:w-auto"
         >
           {busy ? (
             <>
-              <Loader2 className="size-3.5 animate-spin" /> {t("common.saving")}
+              <Loader2 className="size-4 animate-spin" /> {t("common.saving")}
             </>
           ) : (
             <>
-              <CheckCircle2 className="size-3.5" /> {t("review.confirmAndSave")}
+              <CheckCircle2 className="size-4" /> {t("review.confirmAndSave")}
             </>
           )}
         </Button>
