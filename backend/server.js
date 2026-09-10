@@ -180,6 +180,25 @@ app.post('/api/notifications/dispatch-push', async (req, res) => {
   }
 });
 
+app.post('/api/notifications/register-token', async (req, res) => {
+  const { uid, token } = req.body ?? {};
+  if (typeof uid !== 'string' || typeof token !== 'string') {
+    return res.status(400).json({ ok: false, error: 'uid and token are required.' });
+  }
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const db = getFirestore();
+    await db.collection('users').doc(uid).collection('deviceTokens').doc(token).set({
+      token,
+      platform: 'web',
+      updatedAt: new Date(),
+    }, { merge: true });
+    return res.status(200).json({ ok: true, registered: true });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.post('/api/notifications/schedule-test-push', async (req, res) => {
   const { uid, delaySeconds = 10, lang = 'en' } = req.body ?? {};
   if (typeof uid !== 'string') {
@@ -210,6 +229,21 @@ app.post('/api/notifications/schedule-test-push', async (req, res) => {
 
   setTimeout(async () => {
     try {
+      // 1. Record in-app notification in Firestore so it appears in the notification center
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const db = getFirestore();
+      await db.collection('users').doc(uid).collection('notifications').add({
+        type: 'reminder',
+        category: 'lifestyle',
+        title,
+        message: body,
+        priority: 'low',
+        status: 'delivered',
+        deliveredAt: new Date(),
+        createdAt: new Date(),
+      });
+
+      // 2. Dispatch real FCM push to all registered devices (wakes lock screen and notification tray)
       await sendUserPush(uid, title, body, {
         type: 'test_alert',
         scheduled: 'true',

@@ -20,7 +20,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app";
@@ -31,6 +31,8 @@ import { NewUserGuidePrompt } from "@/features/guide/NewUserGuidePrompt";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { LanguageSelector } from "@/features/i18n/LanguageSelector";
 import { useTranslation } from "@/locales/i18n";
+import { ensureWebPushSubscribed, listenForForegroundPush } from "@/services/notifications/webPush";
+import { showBrowserNotification } from "@/services/notifications/notifications";
 
 export const NAV_SECTIONS = [
   {
@@ -87,6 +89,41 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { t } = useTranslation();
+
+  // Keep FCM device token synced and listen for real-time foreground pushes
+  useEffect(() => {
+    if (!user?.uid) return;
+    let unsubscribe: (() => void) | null = null;
+    void (async () => {
+      // 1. Auto-subscribe device token to FCM
+      await ensureWebPushSubscribed(user.uid);
+
+      // 2. Listen for real-time foreground pushes while user is in the app
+      unsubscribe = await listenForForegroundPush((payload) => {
+        const title = payload.notification?.title || payload.data?.title || "HealthGuardian AI";
+        const body = payload.notification?.body || payload.data?.body || "You have a new health alert.";
+
+        // Audio & vibration alert
+        void showBrowserNotification(title, body);
+
+        // In-app interactive toast
+        toast.info(title, {
+          description: body,
+          action: {
+            label: "View",
+            onClick: () => void navigate({ to: "/app/notifications" }),
+          },
+        });
+
+        // Invalidate notifications query to update unread badge and notification center
+        void qc.invalidateQueries({ queryKey: ["notifications"] });
+      });
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [user?.uid, qc, navigate]);
 
   const handleSignOut = async () => {
     setSigningOut(true);

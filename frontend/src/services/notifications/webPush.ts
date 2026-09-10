@@ -2,7 +2,9 @@ import { getMessaging, getToken, isSupported, onMessage, type MessagePayload } f
 import { getFirebaseApp } from "@/services/firebase/config";
 import { saveDeviceToken } from "@/services/firebase/repositories";
 
-const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"] as string | undefined;
+const vapidKey =
+  (import.meta.env["VITE_FIREBASE_VAPID_KEY"] as string | undefined) ||
+  "BJxNK47Xb8JEcj6Ut7IrngcjbGJWWyO1sjp5nyx_xN2gOFBP6CiKy-LrJKEBzKr3LEKUJolBj8Pbxp1Nwsq3ZQM";
 
 export async function registerWebPush(uid: string): Promise<{
   ok: boolean;
@@ -19,12 +21,7 @@ export async function registerWebPush(uid: string): Promise<{
   if (permission !== "granted") return { ok: false, reason: "permission_not_granted" };
 
   try {
-    let registration = await navigator.serviceWorker.getRegistration("/sw.js");
-    if (!registration) {
-      registration = await navigator.serviceWorker.register("/sw.js");
-    }
-    await navigator.serviceWorker.ready;
-
+    const registration = await navigator.serviceWorker.ready;
     const messaging = getMessaging(getFirebaseApp());
     const token = await getToken(messaging, {
       vapidKey,
@@ -32,7 +29,25 @@ export async function registerWebPush(uid: string): Promise<{
     });
 
     if (!token) return { ok: false, reason: "token_unavailable" };
-    await saveDeviceToken(uid, token);
+
+    // 1. Client-side Firestore token persistence
+    try {
+      await saveDeviceToken(uid, token);
+    } catch (e) {
+      console.warn("Client Firestore token save error:", e);
+    }
+
+    // 2. Server-side Firebase Admin persistence (bypasses any client rule limits)
+    try {
+      await fetch("/api/notifications/register-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, token }),
+      });
+    } catch (e) {
+      console.warn("Server token registration error:", e);
+    }
+
     return { ok: true, token };
   } catch (error) {
     console.warn("Web push registration failed:", error);

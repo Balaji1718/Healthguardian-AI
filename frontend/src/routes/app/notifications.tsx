@@ -101,14 +101,17 @@ export function NotificationsPage() {
     if (currentPermission !== "granted") {
       const res = await requestNotificationPermission();
       if (res === "granted") {
-        await registerWebPush(uid);
+        const reg = await registerWebPush(uid);
+        if (!reg.ok) {
+          console.warn("Push registration notice:", reg.reason);
+        }
         currentPermission = "granted";
       } else {
-        toast.warning("Please grant notification permission in browser settings to receive alerts.");
+        toast.warning("Please grant notification permission in browser settings to receive alerts in your phone status bar.");
         return;
       }
     } else {
-      await ensureWebPushSubscribed(uid);
+      await registerWebPush(uid);
     }
 
     if (delayed) {

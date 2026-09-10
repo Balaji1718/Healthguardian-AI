@@ -16,10 +16,12 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || payload.data?.title || "HealthGuardian AI";
   const body = payload.notification?.body || payload.data?.body || "You have a new health update.";
+  const origin = self.location.origin;
+  const iconUrl = new URL("/pwa-192.png", origin).href;
   self.registration.showNotification(title, {
     body,
-    icon: "/pwa-192.png",
-    badge: "/pwa-192.png",
+    icon: iconUrl,
+    badge: iconUrl,
     vibrate: [200, 100, 200],
     requireInteraction: true,
     tag: payload.data?.tag || "healthguardian-alert",
@@ -27,7 +29,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// Native background push handler (wakes device when app is closed)
+// Native background push handler (wakes device when app is closed / killed from recent apps)
 self.addEventListener("push", (event) => {
   let data = {};
   if (event.data) {
@@ -40,12 +42,14 @@ self.addEventListener("push", (event) => {
   const title = data.notification?.title || data.data?.title || data.title || "HealthGuardian AI";
   const body = data.notification?.body || data.data?.body || data.body || "You have a new health reminder or alert.";
   const clickUrl = data.data?.url || data.fcmOptions?.link || "/app/notifications";
+  const origin = self.location.origin;
+  const iconUrl = new URL("/pwa-192.png", origin).href;
 
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: "/pwa-192.png",
-      badge: "/pwa-192.png",
+      icon: iconUrl,
+      badge: iconUrl,
       vibrate: [200, 100, 200],
       requireInteraction: true,
       tag: data.data?.tag || data.tag || "healthguardian-alert",

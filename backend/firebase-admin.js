@@ -50,10 +50,20 @@ export async function sendUserPush(uid, title, body, data = {}) {
   const tokens = snapshot.docs.map((entry) => entry.data().token).filter(Boolean);
   if (!tokens.length) return { delivered: false, reason: "no_registered_devices" };
 
+  const appOrigin = process.env.APP_URL || "https://healthguardian-ai-1.onrender.com";
+  const iconUrl = `${appOrigin}/pwa-192.png`;
+
+  const payloadData = {
+    title: String(title),
+    body: String(body),
+    url: String(data.url || "/app/notifications"),
+    ...Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
+  };
+
   const result = await getMessaging(app).sendEachForMulticast({
     tokens,
     notification: { title, body },
-    data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
+    data: payloadData,
     webpush: {
       headers: {
         Urgency: "high",
@@ -62,11 +72,12 @@ export async function sendUserPush(uid, title, body, data = {}) {
       notification: {
         title,
         body,
-        icon: "/pwa-192.png",
-        badge: "/pwa-192.png",
+        icon: iconUrl,
+        badge: iconUrl,
         requireInteraction: true,
+        vibrate: [200, 100, 200],
       },
-      fcmOptions: { link: "/app/notifications" },
+      fcmOptions: { link: `${appOrigin}${data.url || "/app/notifications"}` },
     },
     android: {
       priority: "high",
