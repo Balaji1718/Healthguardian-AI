@@ -6,10 +6,8 @@ import {
   BellRing,
   Check,
   CheckCheck,
-  Clock,
   Filter,
   Inbox,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,12 +15,6 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useUid } from "@/features/auth/useAuth";
 import { useNotificationsQuery } from "@/features/health/queries";
 import {
@@ -30,8 +22,6 @@ import {
   markRead,
   notificationPermission,
   requestNotificationPermission,
-  sendTestNotification,
-  scheduleServerTestPush,
 } from "@/services/notifications/notifications";
 import { toDate } from "@/services/firebase/repositories";
 import { ContextualHelp } from "@/features/guide/ContextualHelp";
@@ -88,61 +78,6 @@ export function NotificationsPage() {
       toast.error(t("common.error"));
     } else {
       toast.warning(t("common.offlineNotice"));
-    }
-  };
-
-  const handleTestNotification = async (delayed = false) => {
-    if (!uid) {
-      toast.error("Please log in to test notifications.");
-      return;
-    }
-
-    let currentPermission = notificationPermission();
-    if (currentPermission !== "granted") {
-      const res = await requestNotificationPermission();
-      if (res === "granted") {
-        const reg = await registerWebPush(uid);
-        if (!reg.ok) {
-          console.warn("Push registration notice:", reg.reason);
-        }
-        currentPermission = "granted";
-      } else {
-        toast.warning("Please grant notification permission in browser settings to receive alerts in your phone status bar.");
-        return;
-      }
-    } else {
-      await registerWebPush(uid);
-    }
-
-    if (delayed) {
-      setIsProcessing(true);
-      try {
-        const res = await scheduleServerTestPush(uid, 10, language);
-        if (res.ok) {
-          toast.success("Server scheduled FCM push in 10s! Clear app from Recent Apps & lock your phone now!", {
-            duration: 9000,
-          });
-        } else {
-          toast.error("Could not schedule server push.");
-        }
-      } finally {
-        setIsProcessing(false);
-      }
-    } else {
-      setIsProcessing(true);
-      try {
-        const delivered = await sendTestNotification(uid, language);
-        await qc.invalidateQueries({ queryKey: ["notifications"] });
-        if (delivered) {
-          toast.success("Server FCM push dispatched! Check your device notification shade.");
-        } else {
-          toast.info("Notification added to your in-app tray. Enable device alerts to see system popups.");
-        }
-      } catch {
-        toast.error("Could not send test alert.");
-      } finally {
-        setIsProcessing(false);
-      }
     }
   };
 
@@ -234,45 +169,18 @@ export function NotificationsPage() {
         <div className="flex items-center gap-1.5">
           <ContextualHelp content="Alerts are for awareness, not emergency monitoring. Notifications never expose private clinical details." />
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={permission === "granted" ? "outline" : "default"}
-                size="sm"
-                className="h-8 text-xs gap-1.5 rounded-full touch-press shadow-xs"
-                disabled={isProcessing}
-              >
-                <BellRing className="size-3.5" />
-                <span>{permission === "granted" ? "Test Alert" : t("notifications.enableAlerts")}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 text-xs">
-              <DropdownMenuItem
-                onClick={() => void handleTestNotification(false)}
-                className="gap-2.5 py-2 cursor-pointer"
-              >
-                <Sparkles className="size-4 text-primary" />
-                <div>
-                  <span className="font-semibold block">Instant Server FCM Push</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    Dispatches live FCM push from backend server
-                  </span>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => void handleTestNotification(true)}
-                className="gap-2.5 py-2 cursor-pointer"
-              >
-                <Clock className="size-4 text-amber-500" />
-                <div>
-                  <span className="font-semibold block">Test Closed App (10s Delay)</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    Clear app from Recent Apps & lock phone — server pushes in 10s
-                  </span>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {permission !== "granted" && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => void enable()}
+              className="h-8 text-xs gap-1.5 rounded-full touch-press shadow-xs"
+              disabled={isProcessing}
+            >
+              <BellRing className="size-3.5" />
+              <span>{t("notifications.enableAlerts")}</span>
+            </Button>
+          )}
         </div>
       </div>
 
