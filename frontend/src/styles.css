@@ -158,19 +158,34 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   #root {
     min-height: 100vh;
     min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
   }
 
   button,
+  a,
   input,
   textarea,
-  select {
-    min-height: 44px;
+  select,
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  [role="button"],
+  .touch-press {
+    user-select: none;
+    -webkit-user-select: none;
   }
 }
 
@@ -180,7 +195,7 @@
   }
 
   .surface {
-    border-radius: 1rem;
+    border-radius: 1.125rem;
   }
 }
 

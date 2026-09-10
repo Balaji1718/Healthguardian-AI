@@ -25,6 +25,29 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
+// Native background push handler (wakes device when app is closed)
+self.addEventListener("push", (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data = { body: event.data.text() };
+    }
+  }
+  const title = data.notification?.title || data.title || "HealthGuardian AI";
+  const body = data.notification?.body || data.body || "You have a new health reminder or alert.";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/pwa-192.png",
+      badge: "/pwa-192.png",
+      tag: data.tag || "healthguardian-alert",
+      data: data.data || data,
+    }),
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(

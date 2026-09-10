@@ -111,10 +111,21 @@ export function GoalsPage() {
     try {
       if (removeCompleted) {
         await deleteGoal(uid, id);
-        toast.success("Completed goal removed.");
+        toast.success("Completed goal automatically removed.");
       } else {
         await updateGoal(uid, id, { status: "completed" });
-        toast.success("Goal marked complete.");
+        toast.success("Goal marked complete!", {
+          action: {
+            label: "Auto-remove next time",
+            onClick: () => {
+              setRemoveCompleted(true);
+              try {
+                window.localStorage.setItem("hg_remove_completed_goals", "true");
+              } catch {}
+              toast.success("Completed goals will be automatically removed from now on.");
+            },
+          },
+        });
       }
       await qc.invalidateQueries({ queryKey: ["goals"] });
     } catch {

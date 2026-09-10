@@ -3,35 +3,18 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  CheckCircle2,
-  FileEdit,
   FileText,
-  HelpCircle,
-  Loader2,
   Mic,
-  Minus,
-  Plus,
-  RotateCcw,
-  ShieldCheck,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, OfflineNotice } from "@/components/common/States";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { checkinSchema } from "@/core/validation/schemas";
-import { COMMON_SYMPTOMS, FOOD_QUALITY_OPTIONS, WELLBEING_OPTIONS } from "@/core/constants/health";
 import { checkinIdForDate, getCheckin, saveCheckin } from "@/services/firebase/repositories";
 import { useUid } from "@/features/auth/useAuth";
 import { useAppStore } from "@/store/app";
-import { cn } from "@/lib/utils";
-import { formatSymptom } from "@/locales/formatters";
-import { ContextualHelp } from "@/features/guide/ContextualHelp";
 import { CaptureReview } from "@/features/checkin/CaptureReview";
 import { extractCheckinFromText } from "@/services/ai/conversational-checkin";
 import { UnifiedCheckinComposer } from "@/features/checkin/UnifiedCheckinComposer";
@@ -40,6 +23,7 @@ import { runOcr } from "@/services/ocr/ocr";
 import { validateFile } from "@/services/localStorage/documents";
 import { useTranslation } from "@/locales/i18n";
 import type { CheckinSource, DailyCheckin } from "@/models";
+
 
 export const Route = createFileRoute("/app/checkin")({
   component: Checkin,
@@ -76,14 +60,6 @@ const EMPTY: FormState = {
   notes: "",
 };
 
-const WELLBEING_PILLS = [
-  { value: "great", label: "Great", icon: "😊" },
-  { value: "good", label: "Good", icon: "🙂" },
-  { value: "okay", label: "Okay", icon: "😐" },
-  { value: "tired", label: "Tired", icon: "😴" },
-  { value: "not_great", label: "Not great", icon: "🙁" },
-];
-
 function Checkin() {
   const uid = useUid();
   const navigate = useNavigate();
@@ -91,15 +67,14 @@ function Checkin() {
   const online = useAppStore((s) => s.online);
   const { t, language } = useTranslation();
 
-  // Primary capture view: "composer" | "detailed" | "review"
-  const [mode, setMode] = useState<"composer" | "detailed" | "review">("composer");
+  // Pure AI-driven check-in workspace: "composer" | "review"
+  const [mode, setMode] = useState<"composer" | "review">("composer");
   const [activeSource, setActiveSource] = useState<CheckinSource>("conversational");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [form, setForm] = useState<FormState>(EMPTY);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [observations, setObservations] = useState<DailyCheckin["observations"]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   // Extraction & safety warning state
@@ -145,28 +120,6 @@ function Checkin() {
     };
   }, [uid, date]);
 
-  const setField = (k: string, v: string) => {
-    setForm((f) => ({ ...f, [k]: v }));
-  };
-
-  const adjustNumeric = (key: string, step: number, min = 0, max = 100) => {
-    setForm((f) => {
-      const current = f[key] === "" ? min : Number(f[key]);
-      const next = Math.min(max, Math.max(min, current + step));
-      return { ...f, [key]: String(next) };
-    });
-  };
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  };
-
-  const toggleSymptom = (s: string) => {
-    setSymptoms((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
-  };
-
   const getParsedData = (): Partial<DailyCheckin> => {
     const parsed = checkinSchema.safeParse({
       ...form,
@@ -177,52 +130,6 @@ function Checkin() {
 
     if (!parsed.success) return {};
     const d = parsed.data;
-
-    return {
-      sleepHours: d.sleepHours,
-      waterGlasses: d.waterGlasses,
-      exerciseMinutes: d.exerciseMinutes,
-      exerciseType: form["exerciseType"] || undefined,
-      foodQuality: form["foodQuality"] || undefined,
-      weightKg: d.weightKg,
-      wellbeing: form["wellbeing"] || undefined,
-      systolicBP: d.systolicBP,
-      diastolicBP: d.diastolicBP,
-      bloodGlucose: d.bloodGlucose,
-      bloodGlucoseUnit: d.bloodGlucose != null ? form["bloodGlucoseUnit"] : undefined,
-      notes: form["notes"] || undefined,
-      observations,
-      symptoms,
-      tags: selectedTags,
-      source: activeSource,
-      verificationStatus: "user_verified",
-    };
-  };
-
-  const validateAndGetParsedData = (): Partial<DailyCheckin> | null => {
-    const parsed = checkinSchema.safeParse({
-      ...form,
-      tags: selectedTags,
-      source: activeSource,
-      verificationStatus: "user_verified",
-    });
-
-    if (!parsed.success) {
-      const next: Record<string, string> = {};
-      for (const issue of parsed.error.issues) next[String(issue.path[0])] = issue.message;
-      setErrors(next);
-      toast.error("Please correct the highlighted values.");
-      return null;
-    }
-
-    setErrors({});
-    const d = parsed.data;
-
-    if ((d.systolicBP == null) !== (d.diastolicBP == null)) {
-      setErrors({ systolicBP: "Enter both blood pressure numbers, or leave both blank." });
-      toast.error("Enter both blood pressure numbers, or leave both blank.");
-      return null;
-    }
 
     return {
       sleepHours: d.sleepHours,
@@ -278,7 +185,7 @@ function Checkin() {
       if (!res.ok || !res.data) {
         toast.error(
           res.error ||
-            "I couldn't understand that check-in clearly. You can edit the text or use Detailed Check-in.",
+            "I couldn't understand that check-in clearly. Please try speaking or typing with more details.",
         );
         return;
       }
@@ -331,7 +238,7 @@ function Checkin() {
       setMode("review");
       toast.success("Check-in extracted. Please review and confirm your values.");
     } catch {
-      toast.error("Extraction error. You can use Detailed Check-in instead.");
+      toast.error("Extraction error. Please try speaking or typing again.");
     } finally {
       setExtracting(false);
     }
@@ -414,18 +321,14 @@ function Checkin() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
         <PageHeader
           title={
-            mode === "detailed"
-              ? t("checkin.detailedTitle")
-              : mode === "review"
-                ? t("checkin.reviewTitle")
-                : t("checkin.title")
+            mode === "review"
+              ? t("checkin.reviewTitle")
+              : t("checkin.title")
           }
           description={
-            mode === "detailed"
-              ? t("checkin.detailedSubtitle")
-              : mode === "review"
-                ? t("checkin.reviewSubtitle")
-                : t("checkin.subtitle")
+            mode === "review"
+              ? t("checkin.reviewSubtitle")
+              : t("checkin.subtitle")
           }
         />
 
@@ -435,9 +338,9 @@ function Checkin() {
             variant="outline"
             size="sm"
             onClick={() => setMode("composer")}
-            className="text-xs h-8"
+            className="text-xs h-8 touch-press"
           >
-            {t("checkin.backToQuick")}
+            ← {t("checkin.backToQuick")}
           </Button>
         )}
       </div>
@@ -478,10 +381,6 @@ function Checkin() {
               void executeExtraction(transcript, "voice", cleanLang);
             }}
             onFileSelect={handleDeviceFileSelect}
-            onOpenDetailed={() => {
-              setActiveSource("manual");
-              setMode("detailed");
-            }}
             extracting={extracting}
           />
 
@@ -544,316 +443,10 @@ function Checkin() {
           sourceDocument={sourceDoc?.name}
           sourcePage={sourceDoc?.page}
           inputUtterance={rawInputUtterance}
-          onEdit={() => setMode("detailed")}
+          onEdit={() => setMode("composer")}
           onConfirm={handleConfirmSave}
           busy={busy}
         />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. DETAILED CLINICAL CHECK-IN FORM                                        */}
-      {/* ========================================================================= */}
-      {mode === "detailed" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const data = validateAndGetParsedData();
-            if (data) {
-              setMode("review");
-            }
-          }}
-          className="space-y-6"
-        >
-          {/* Date Picker */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border bg-card/60">
-            <div className="space-y-0.5">
-              <Label htmlFor="checkin-date" className="text-xs font-semibold">
-                Log Date
-              </Label>
-              <p className="text-[11px] text-muted-foreground">
-                Select the day this health entry applies to.
-              </p>
-            </div>
-            <Input
-              id="checkin-date"
-              type="date"
-              max={new Date().toISOString().slice(0, 10)}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-40 text-xs"
-            />
-          </div>
-
-          {/* Wellbeing / Mood Selector */}
-          <section className="surface space-y-3 p-4 sm:p-6 rounded-2xl border">
-            <h2 className="font-semibold text-sm text-foreground">{t("dashboard.wellbeing") || "How are you feeling today?"}</h2>
-            <div className="flex flex-wrap gap-2">
-              {WELLBEING_PILLS.map((pill) => {
-                const active = form.wellbeing === pill.value;
-                return (
-                  <button
-                    key={pill.value}
-                    type="button"
-                    onClick={() => setField("wellbeing", active ? "" : pill.value)}
-                    className={cn(
-                      "touch-press flex min-h-[44px] items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-medium transition-all cursor-pointer",
-                      active
-                        ? "border-primary bg-primary/10 text-primary shadow-xs ring-2 ring-primary/20"
-                        : "hover:bg-muted text-muted-foreground bg-card",
-                    )}
-                  >
-                    <span className="text-base">{pill.icon}</span>
-                    <span>{pill.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Daily Habits */}
-          <section className="surface space-y-4 p-4 sm:p-6 rounded-2xl border">
-            <h2 className="font-semibold text-sm text-foreground">Core Daily Habits</h2>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="sleepHours">Sleep (hours)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("sleepHours", -0.5, 0, 24)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Minus className="size-4" />
-                  </Button>
-                  <Input
-                    id="sleepHours"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    max="24"
-                    placeholder="e.g. 7.5"
-                    value={form.sleepHours}
-                    onChange={(e) => setField("sleepHours", e.target.value)}
-                    className="h-10 text-center text-sm font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("sleepHours", 0.5, 0, 24)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="waterGlasses">Water (glasses)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("waterGlasses", -1, 0, 30)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Minus className="size-4" />
-                  </Button>
-                  <Input
-                    id="waterGlasses"
-                    type="number"
-                    min="0"
-                    max="30"
-                    placeholder="e.g. 8"
-                    value={form.waterGlasses}
-                    onChange={(e) => setField("waterGlasses", e.target.value)}
-                    className="h-10 text-center text-sm font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("waterGlasses", 1, 0, 30)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="exerciseMinutes">Exercise (min)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("exerciseMinutes", -5, 0, 360)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Minus className="size-4" />
-                  </Button>
-                  <Input
-                    id="exerciseMinutes"
-                    type="number"
-                    min="0"
-                    max="360"
-                    placeholder="e.g. 30"
-                    value={form.exerciseMinutes}
-                    onChange={(e) => setField("exerciseMinutes", e.target.value)}
-                    className="h-10 text-center text-sm font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => adjustNumeric("exerciseMinutes", 5, 0, 360)}
-                    className="touch-press size-10 rounded-xl"
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Vitals & Biomarkers */}
-          <section className="surface space-y-4 p-6 rounded-2xl border">
-            <h2 className="font-semibold text-sm text-foreground">{t("dashboard.recentVitals")}</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="weightKg">{t("dashboard.weight")} (kg)</Label>
-                <Input
-                  id="weightKg"
-                  type="number"
-                  step="0.1"
-                  min="20"
-                  max="400"
-                  placeholder="e.g. 70.5"
-                  value={form.weightKg}
-                  onChange={(e) => setField("weightKg", e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="systolicBP">{t("dashboard.bloodPressure")} (Systolic mmHg)</Label>
-                <Input
-                  id="systolicBP"
-                  type="number"
-                  min="60"
-                  max="260"
-                  placeholder="e.g. 120"
-                  value={form.systolicBP}
-                  onChange={(e) => setField("systolicBP", e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="diastolicBP">{t("dashboard.bloodPressure")} (Diastolic mmHg)</Label>
-                <Input
-                  id="diastolicBP"
-                  type="number"
-                  min="30"
-                  max="200"
-                  placeholder="e.g. 80"
-                  value={form.diastolicBP}
-                  onChange={(e) => setField("diastolicBP", e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 pt-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="bloodGlucose">{t("dashboard.bloodGlucose")}</Label>
-                <Input
-                  id="bloodGlucose"
-                  type="number"
-                  step="0.1"
-                  min="1"
-                  max="900"
-                  placeholder="e.g. 95"
-                  value={form.bloodGlucose}
-                  onChange={(e) => setField("bloodGlucose", e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="bloodGlucoseUnit">Glucose unit</Label>
-                <select
-                  id="bloodGlucoseUnit"
-                  value={form.bloodGlucoseUnit}
-                  onChange={(e) => setField("bloodGlucoseUnit", e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
-                >
-                  <option value="mg/dL">mg/dL</option>
-                  <option value="mmol/L">mmol/L</option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* Symptoms */}
-          <section className="surface space-y-4 p-6 rounded-2xl border">
-            <h2 className="font-semibold text-sm text-foreground">{t("checkin.symptoms")}</h2>
-            <div className="flex flex-wrap gap-2">
-              {COMMON_SYMPTOMS.map((s) => {
-                const active = symptoms.includes(s);
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => toggleSymptom(s)}
-                    className={cn(
-                      "touch-press flex min-h-[36px] items-center rounded-full border px-3.5 py-1.5 text-xs capitalize transition-colors cursor-pointer",
-                      active
-                        ? "border-destructive bg-destructive/10 text-destructive font-medium shadow-xs"
-                        : "hover:bg-muted text-muted-foreground bg-card",
-                    )}
-                  >
-                    {formatSymptom(s, t)}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Notes */}
-          <section className="surface space-y-4 p-4 sm:p-6 rounded-2xl border">
-            <h2 className="font-semibold text-sm text-foreground">{t("checkin.notes")}</h2>
-            <Textarea
-              id="notes"
-              rows={3}
-              placeholder="Any additional context about your day…"
-              value={form.notes}
-              onChange={(e) => setField("notes", e.target.value)}
-              className="text-xs resize-none"
-            />
-          </section>
-
-          {/* Action Row */}
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setMode("composer")}
-              className="touch-press text-xs h-10 w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
-
-            <Button type="submit" className="touch-press gap-2 font-semibold shadow-xs text-sm min-h-[48px] px-6 w-full sm:w-auto">
-              <ShieldCheck className="size-4" /> Review & Confirm →
-            </Button>
-          </div>
-        </form>
       )}
 
       <Disclaimer />

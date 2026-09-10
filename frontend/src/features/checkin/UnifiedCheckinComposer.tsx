@@ -5,7 +5,6 @@ import {
   ArrowUp,
   FolderPlus,
   Upload,
-  FileEdit,
   Sparkles,
   Loader2,
   ChevronDown,
@@ -32,7 +31,7 @@ interface UnifiedCheckinComposerProps {
   onTextSubmit: (text: string) => void;
   onVoiceTranscriptReady: (transcript: string, language: string) => void;
   onFileSelect: (file: File) => void;
-  onOpenDetailed: () => void;
+  onOpenDetailed?: () => void;
   onFolderConnected?: () => void;
   extracting: boolean;
 }
@@ -187,12 +186,12 @@ export function UnifiedCheckinComposer({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={onOpenDetailed} className="gap-2.5 py-2 cursor-pointer">
-                  <FileEdit className="size-4 text-primary" />
+                <DropdownMenuItem onClick={() => setIsRecordingVoice(true)} className="gap-2.5 py-2 cursor-pointer">
+                  <Mic className="size-4 text-primary" />
                   <div>
-                    <span className="font-medium block">Detailed Check-in</span>
+                    <span className="font-medium block">Voice Check-in</span>
                     <span className="text-[10px] text-muted-foreground">
-                      Full structured form entry
+                      Multilingual voice dictation (up to 5m)
                     </span>
                   </div>
                 </DropdownMenuItem>

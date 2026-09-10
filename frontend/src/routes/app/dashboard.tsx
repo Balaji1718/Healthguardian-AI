@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Bot,
   CalendarCheck,
+  Check,
   CheckCircle2,
   Droplets,
   FileText,
@@ -38,7 +39,7 @@ import { syncPatternNotifications } from "@/services/notifications/notifications
 import { syncAdaptiveNotifications } from "@/services/notifications/adaptive";
 import { calculateAdaptiveEvidence } from "@/features/healthRisk/engine";
 import { buildHealthContext } from "@/core/adaptive/context";
-import { toDate } from "@/services/firebase/repositories";
+import { toDate, deleteGoal, updateGoal } from "@/services/firebase/repositories";
 import { SCORE_BANDS, ENABLE_ADAPTIVE_V2 } from "@/core/constants/health";
 import {
   isSampleProfileActive,
@@ -128,6 +129,42 @@ function Dashboard() {
       toast.error("Failed to clear sample data. Please try again.");
     } finally {
       setClearingDemo(false);
+    }
+  };
+
+  const handleCompleteGoal = async (goalId: string) => {
+    if (!uid) return;
+    try {
+      const autoRemove = window.localStorage.getItem("hg_remove_completed_goals") === "true";
+      if (autoRemove) {
+        await deleteGoal(uid, goalId);
+        toast.success("Goal completed and automatically removed.");
+      } else {
+        await updateGoal(uid, goalId, { status: "completed" });
+        toast.success("Goal marked complete!", {
+          action: {
+            label: "Auto-remove completed",
+            onClick: () => {
+              window.localStorage.setItem("hg_remove_completed_goals", "true");
+              toast.success("Completed goals will be automatically removed from now on.");
+            },
+          },
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ["goals", uid] });
+    } catch {
+      toast.error(t("common.error"));
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!uid || !window.confirm("Delete this goal?")) return;
+    try {
+      await deleteGoal(uid, goalId);
+      await qc.invalidateQueries({ queryKey: ["goals", uid] });
+      toast.success("Goal deleted.");
+    } catch {
+      toast.error(t("common.error"));
     }
   };
 
@@ -531,13 +568,37 @@ function Dashboard() {
               {(goals.data ?? []).filter((g) => g.status === "active").length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("dashboard.noActiveGoals")}</p>
               ) : (
-                <ul className="space-y-2.5">
+                <ul className="space-y-2">
                   {(goals.data ?? [])
                     .filter((g) => g.status === "active")
-                    .slice(0, 2)
+                    .slice(0, 3)
                     .map((g) => (
-                      <li key={g.id} className="space-y-1">
-                        <p className="text-xs font-medium truncate">{formatGoalTitle(g.title, t)}</p>
+                      <li key={g.id} className="space-y-1.5 p-2.5 rounded-xl bg-card border border-border/70 shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold truncate text-foreground flex-1 min-w-0">
+                            {formatGoalTitle(g.title, t)}
+                          </p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => g.id && void handleCompleteGoal(g.id)}
+                              className="size-7 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center transition-colors touch-press"
+                              title="Mark goal complete"
+                              aria-label="Mark goal complete"
+                            >
+                              <Check className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => g.id && void handleDeleteGoal(g.id)}
+                              className="size-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors touch-press"
+                              title="Delete goal"
+                              aria-label="Delete goal"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
                         <Progress
                           className="h-1.5"
                           value={
