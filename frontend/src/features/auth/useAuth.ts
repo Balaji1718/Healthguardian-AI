@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/store/app";
 import { isFirebaseConfigured, initAppCheck } from "@/services/firebase/config";
 import { watchAuth } from "@/services/firebase/auth";
+import { registerWebPush } from "@/services/notifications/webPush";
 
 /** Single auth subscriber; mounted once by the app layout. */
 export function useAuthListener() {
@@ -30,6 +31,9 @@ export function useAuthListener() {
     const unsub = watchAuth((u) => {
       setUser(u);
       setAuthLoading(false);
+      if (u && typeof Notification !== "undefined" && Notification.permission === "granted") {
+        void registerWebPush(u.uid);
+      }
     });
 
     return () => {

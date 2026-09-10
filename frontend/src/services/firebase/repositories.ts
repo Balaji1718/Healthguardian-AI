@@ -22,6 +22,7 @@ import {
   checkinsCol,
   goalsCol,
   guidanceCol,
+  deviceTokensCol,
   healthProfileDoc,
   messagesCol,
   notificationsCol,
@@ -116,6 +117,14 @@ export async function ensureUserRoot(uid: string, email: string, displayName: st
 export async function getUserRoot(uid: string): Promise<UserRoot | null> {
   const snap = await getDoc(userDoc(uid));
   return snap.exists() ? (snap.data() as UserRoot) : null;
+}
+
+export async function saveDeviceToken(uid: string, token: string) {
+  await setDoc(
+    doc(deviceTokensCol(uid), token),
+    clean({ token, platform: "web", updatedAt: serverTimestamp() }),
+    { merge: true },
+  );
 }
 
 /* -------------------------------- profile -------------------------------- */
@@ -310,6 +319,10 @@ export async function createGoal(uid: string, g: Goal) {
 
 export async function updateGoal(uid: string, id: string, data: Partial<Goal>) {
   await updateDoc(doc(goalsCol(uid), id), clean({ ...data, updatedAt: serverTimestamp() }));
+}
+
+export async function deleteGoal(uid: string, id: string) {
+  await deleteDoc(doc(goalsCol(uid), id));
 }
 
 export async function listGoals(uid: string, max = 50): Promise<Goal[]> {

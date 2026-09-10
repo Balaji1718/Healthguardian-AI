@@ -20,6 +20,7 @@ import {
   formatSupportType,
 } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
+import { getFirebaseAuth } from "@/services/firebase/auth";
 
 export const Route = createFileRoute("/app/support")({
   component: SupportPage,
@@ -69,16 +70,37 @@ export function SupportPage() {
     setErrors({});
     setBusy(true);
     try {
-      await createSupportRequest(uid, {
+      const requestId = await createSupportRequest(uid, {
         type: form.type,
         reason: form.reason,
         message: form.message,
         status: "open",
         priority: form.priority,
       });
+      let emailDelivered = false;
+      try {
+        const emailResponse = await fetch("/api/support/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            userEmail: getFirebaseAuth().currentUser?.email ?? "",
+            userName: getFirebaseAuth().currentUser?.displayName ?? "",
+            requestId,
+          }),
+        });
+        const emailResult = (await emailResponse.json()) as { delivered?: boolean };
+        emailDelivered = emailResult.delivered === true;
+      } catch {
+        emailDelivered = false;
+      }
       await qc.invalidateQueries({ queryKey: ["support"] });
       setForm({ type: "question", reason: "", message: "", priority: "normal" });
-      toast.success(t("common.success"));
+      toast.success(
+        emailDelivered
+          ? "Support request sent to the HealthGuardian support team."
+          : "Support request saved. Email delivery is pending server configuration.",
+      );
     } catch {
       toast.error(t("common.error"));
     } finally {

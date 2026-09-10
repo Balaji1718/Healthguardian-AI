@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Target } from "lucide-react";
+import { Loader2, Plus, Target, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -14,7 +14,7 @@ import { useUid } from "@/features/auth/useAuth";
 import { useGoals } from "@/features/health/queries";
 import { goalSchema } from "@/core/validation/schemas";
 import { GOAL_TYPES } from "@/core/constants/health";
-import { createGoal, updateGoal } from "@/services/firebase/repositories";
+import { createGoal, deleteGoal, updateGoal } from "@/services/firebase/repositories";
 import { ContextualHelp } from "@/features/guide/ContextualHelp";
 import { formatGoalProgress, formatGoalTitle } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
@@ -53,6 +53,13 @@ export function GoalsPage() {
     targetDate: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [removeCompleted, setRemoveCompleted] = useState(() => {
+    try {
+      return window.localStorage.getItem("hg_remove_completed_goals") === "true";
+    } catch {
+      return false;
+    }
+  });
 
   if (isLoading) return <LoadingState label={t("common.loading")} />;
   if (isError) return <ErrorState onRetry={() => void refetch()} />;
@@ -101,8 +108,29 @@ export function GoalsPage() {
 
   const complete = async (id: string) => {
     if (!uid) return;
-    await updateGoal(uid, id, { status: "completed" });
-    await qc.invalidateQueries({ queryKey: ["goals"] });
+    try {
+      if (removeCompleted) {
+        await deleteGoal(uid, id);
+        toast.success("Completed goal removed.");
+      } else {
+        await updateGoal(uid, id, { status: "completed" });
+        toast.success("Goal marked complete.");
+      }
+      await qc.invalidateQueries({ queryKey: ["goals"] });
+    } catch {
+      toast.error(t("common.error"));
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!uid || !window.confirm("Delete this goal permanently?")) return;
+    try {
+      await deleteGoal(uid, id);
+      await qc.invalidateQueries({ queryKey: ["goals"] });
+      toast.success("Goal deleted.");
+    } catch {
+      toast.error(t("common.error"));
+    }
   };
 
   const goals = data ?? [];
@@ -193,6 +221,29 @@ export function GoalsPage() {
         </form>
       )}
 
+      <label className="mb-4 flex items-start gap-3 rounded-lg border bg-card/60 p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={removeCompleted}
+          onChange={(event) => {
+            const enabled = event.target.checked;
+            setRemoveCompleted(enabled);
+            try {
+              window.localStorage.setItem("hg_remove_completed_goals", String(enabled));
+            } catch {
+              // Ignore storage errors; the current choice still applies this session.
+            }
+          }}
+          className="mt-0.5 size-4 accent-primary"
+        />
+        <span>
+          <span className="block font-medium">Automatically remove completed goals</span>
+          <span className="text-xs text-muted-foreground">
+            When enabled, marking a goal complete permanently deletes it after your explicit opt-in.
+          </span>
+        </span>
+      </label>
+
       {goals.length === 0 ? (
         <EmptyState title={t("goals.emptyTitle")} description={t("goals.emptyDesc")} />
       ) : (
@@ -218,13 +269,33 @@ export function GoalsPage() {
                 />
               )}
               {g.status === "active" && g.id && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-0 text-xs"
+                    onClick={() => void complete(g.id!)}
+                  >
+                    {t("goals.markComplete")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-0 text-xs text-destructive hover:text-destructive"
+                    onClick={() => void remove(g.id!)}
+                  >
+                    <Trash2 className="mr-1.5 size-3.5" /> Delete
+                  </Button>
+                </div>
+              )}
+              {g.status !== "active" && g.id && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="mt-3 px-0 text-xs"
-                  onClick={() => void complete(g.id!)}
+                  className="mt-3 px-0 text-xs text-destructive hover:text-destructive"
+                  onClick={() => void remove(g.id!)}
                 >
-                  {t("goals.markComplete")}
+                  <Trash2 className="mr-1.5 size-3.5" /> Delete
                 </Button>
               )}
             </li>

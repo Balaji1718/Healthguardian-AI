@@ -15,6 +15,7 @@
     "cross-env": "^10.0.0",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
+    "firebase-admin": "^14.3.0",
     "healthguardian-ai": "file:..",
     "vite": "^8.2.0",
     "zod": "^4.4.3"

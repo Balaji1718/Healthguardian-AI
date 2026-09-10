@@ -42,6 +42,10 @@ function ensureApp(): FirebaseApp {
   return app;
 }
 
+export function getFirebaseApp(): FirebaseApp {
+  return ensureApp();
+}
+
 export function getFirebaseAuth(): Auth {
   if (!authInstance) authInstance = getAuth(ensureApp());
   return authInstance;

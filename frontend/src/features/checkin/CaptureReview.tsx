@@ -67,6 +67,7 @@ export function CaptureReview({
     symptoms: Boolean(data.symptoms && data.symptoms.length > 0),
     tags: Boolean(data.tags && data.tags.length > 0),
     notes: Boolean(data.notes),
+    observations: Boolean(data.observations && data.observations.length > 0),
   });
 
   const toggleField = (fieldKey: string) => {
@@ -186,6 +187,7 @@ export function CaptureReview({
       symptoms: includedFields.symptoms ? (data.symptoms ?? []) : [],
       tags: includedFields.tags ? (data.tags ?? []) : [],
       notes: includedFields.notes ? (data.notes ?? null) : null,
+      observations: includedFields.observations ? (data.observations ?? []) : [],
     };
 
     await onConfirm(finalPayload);
@@ -373,6 +375,32 @@ export function CaptureReview({
                 </Badge>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {data.observations && data.observations.length > 0 && (
+        <div className="space-y-1.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-foreground">Additional details understood:</span>
+            <button
+              type="button"
+              onClick={() => toggleField("observations")}
+              className="text-[11px] text-primary hover:underline"
+            >
+              {includedFields.observations ? "Exclude" : "Include"}
+            </button>
+          </div>
+          {includedFields.observations && (
+            <ul className="space-y-1 text-muted-foreground">
+              {data.observations.map((observation, index) => (
+                <li key={`${observation.label}-${index}`}>
+                  <span className="font-medium text-foreground">{observation.label}</span>
+                  {observation.valueText ? `: ${observation.valueText}` : ""}
+                  {observation.temporalContext ? ` (${observation.temporalContext})` : ""}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

@@ -1,10 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // We read the actual action-validation.ts code and mock its imports dynamically
 // so we don't have to load the browser/Firebase environment dependencies in Node.
-const tsPath = path.resolve("..", "frontend", "src", "features", "agent", "action-validation.ts");
+const tsPath = path.resolve(__dirname, "..", "frontend", "src", "features", "agent", "action-validation.ts");
 let tsContent = await fs.readFile(tsPath, "utf8");
 
 // Mock the imports and exports so Node can run it

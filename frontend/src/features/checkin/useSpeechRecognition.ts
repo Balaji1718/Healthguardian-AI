@@ -229,7 +229,9 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState("en-IN");
 
-  const isListeningRef = useRef(false);
+  const shouldKeepListeningRef = useRef(false);
+  const baseTranscriptRef = useRef("");
+  const isListeningRef = shouldKeepListeningRef;
 
   const updateLanguageFromText = useCallback(
     (rawText: string) => {

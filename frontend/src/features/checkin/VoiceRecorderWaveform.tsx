@@ -37,15 +37,11 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
   const [recorderState, setRecorderState] = useState<RecorderState>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [editableTranscript, setEditableTranscript] = useState("");
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isImprovingTranscript, setIsImprovingTranscript] = useState(false);
   const [audioPlaybackTime, setAudioPlaybackTime] = useState(0);
 
   const timerRef = useRef<number | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Sync transcript to editable state when new words arrive
   useEffect(() => {
@@ -75,6 +71,20 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
     };
   }, [recorderState]);
 
+  // Register development diagnostics
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as unknown as { __HEALTHGUARDIAN_VOICE_DIAGNOSTICS__: Record<string, unknown> }).__HEALTHGUARDIAN_VOICE_DIAGNOSTICS__ = {
+        activePipeline: "WebSpeechAPI",
+        singleAuthoritativeStream: true,
+        hardwareEchoSuppression: true,
+        recorderState,
+        activeLanguage: speech.language,
+        timestamp: Date.now(),
+      };
+    }
+  }, [recorderState, speech.language]);
+
   // Format seconds to mm:ss
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -83,81 +93,34 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
   };
 
   // Start recording
-  const handleStartRecording = useCallback(async () => {
+  const handleStartRecording = useCallback(() => {
     speech.reset();
     setElapsedSeconds(0);
     setEditableTranscript("");
-    if (mediaUrl) {
-      URL.revokeObjectURL(mediaUrl);
-      setMediaUrl(null);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
-    audioChunksRef.current = [];
-
-    // Optional audio capture for local preview with echo cancellation
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            // Mobile: speaker-phone mode reduces echo during playback
-            channelCount: { ideal: 1 },
-          },
-        });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = () => {
-          if (audioChunksRef.current.length > 0) {
-            const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-            const url = URL.createObjectURL(audioBlob);
-            setMediaUrl(url);
-          }
-          // Stop stream tracks
-          stream.getTracks().forEach((track) => track.stop());
-        };
-
-        mediaRecorder.start(200);
-      } catch (err) {
-        console.warn("MediaRecorder audio preview not available:", err);
-      }
-    }
+    setIsPlayingAudio(false);
 
     speech.startListening();
     setRecorderState("recording");
-  }, [speech, mediaUrl]);
+  }, [speech]);
 
   // Pause recording
   const handlePauseRecording = () => {
     speech.stopListening();
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.pause();
-    }
     setRecorderState("paused");
   };
 
   // Resume recording
   const handleResumeRecording = () => {
     speech.startListening();
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-      mediaRecorderRef.current.resume();
-    }
     setRecorderState("recording");
   };
 
   // Finish / Stop recording
   const handleStopRecording = () => {
     speech.stopListening();
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
     setRecorderState("stopped");
   };
 
@@ -179,55 +142,43 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
   // Cancel / Delete
   const handleCancel = () => {
     speech.reset();
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
-    if (mediaUrl) {
-      URL.revokeObjectURL(mediaUrl);
-      setMediaUrl(null);
-    }
+    setIsPlayingAudio(false);
     setRecorderState("idle");
     setElapsedSeconds(0);
     setEditableTranscript("");
     onCancel();
   };
 
-  // Audio preview toggle
+  // Audio preview toggle via SpeechSynthesis (zero duplicate mic streams, zero feedback)
   const togglePlayAudio = () => {
-    if (!mediaUrl) return;
-    if (!audioElementRef.current) {
-      audioElementRef.current = new Audio(mediaUrl);
-      audioElementRef.current.ontimeupdate = () => {
-        if (audioElementRef.current) {
-          setAudioPlaybackTime(audioElementRef.current.currentTime);
-        }
-      };
-      audioElementRef.current.onended = () => {
-        setIsPlayingAudio(false);
-        setAudioPlaybackTime(0);
-      };
-    }
-
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     if (isPlayingAudio) {
-      audioElementRef.current.pause();
+      window.speechSynthesis.cancel();
       setIsPlayingAudio(false);
-    } else {
-      audioElementRef.current.play().catch((err) => {
-        console.warn("Audio playback error:", err);
-      });
-      setIsPlayingAudio(true);
+      return;
     }
+    if (!editableTranscript.trim()) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(editableTranscript);
+    utterance.lang = speech.language;
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+    setIsPlayingAudio(true);
+    window.speechSynthesis.speak(utterance);
   };
 
   // Auto-start on mount if idle
   useEffect(() => {
     if (recorderState === "idle") {
-      void handleStartRecording();
+      handleStartRecording();
     }
     return () => {
-      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,8 +329,8 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
       {/* Stopped / Transcript Verification State */}
       {recorderState === "stopped" && (
         <div className="space-y-3">
-          {/* Audio Preview Bar (if recorded) */}
-          {mediaUrl && (
+          {/* Audio Preview Bar (Speech Synthesis preview) */}
+          {editableTranscript.trim() && (
             <div
               className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-muted/30 border text-xs transition-colors"
               style={{

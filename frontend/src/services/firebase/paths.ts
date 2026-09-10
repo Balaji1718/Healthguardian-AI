@@ -19,3 +19,4 @@ export const messagesCol = (uid: string, sessionId: string) =>
   collection(getDb(), "users", uid, "agentSessions", sessionId, "messages");
 export const guidanceCol = (uid: string) => collection(getDb(), "users", uid, "specialistGuidance");
 export const supportCol = (uid: string) => collection(getDb(), "users", uid, "supportRequests");
+export const deviceTokensCol = (uid: string) => collection(getDb(), "users", uid, "deviceTokens");

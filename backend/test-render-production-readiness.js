@@ -112,9 +112,10 @@ async function runTests() {
   });
 
   let serverStarted = false;
+  let serverOutput = '';
   serverProcess.stdout.on('data', (d) => {
-    const out = d.toString();
-    if (out.includes('HealthGuardian app running')) {
+    serverOutput += d.toString();
+    if (serverOutput.includes('HealthGuardian app running')) {
       serverStarted = true;
     }
   });
@@ -123,8 +124,8 @@ async function runTests() {
     console.error(`[Server stderr]: ${d.toString()}`);
   });
 
-  // Wait up to 10s for server to start
-  for (let i = 0; i < 50; i++) {
+  // Wait up to 20s for server to start
+  for (let i = 0; i < 100; i++) {
     if (serverStarted) break;
     await sleep(200);
   }

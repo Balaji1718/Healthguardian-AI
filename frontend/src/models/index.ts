@@ -47,6 +47,20 @@ export type CheckinSource =
 
 export type CheckinVerificationStatus = "user_verified" | "unverified";
 
+export interface HealthObservation {
+  id?: string | undefined;
+  category: string;
+  label: string;
+  valueText?: string | undefined;
+  numericValue?: number | null | undefined;
+  unit?: string | undefined;
+  temporalContext?: string | undefined;
+  severity?: string | undefined;
+  confidence: "high" | "medium" | "low";
+  sourceText: string;
+  userConfirmed?: boolean | undefined;
+}
+
 export interface DailyCheckin {
   id?: string | undefined;
   date: TS;
@@ -63,6 +77,7 @@ export interface DailyCheckin {
   bloodGlucose?: number | null | undefined;
   bloodGlucoseUnit?: string | undefined;
   notes?: string | undefined;
+  observations?: HealthObservation[] | undefined;
   tags?: string[] | undefined;
   source?: CheckinSource | undefined;
   verificationStatus?: CheckinVerificationStatus | undefined;

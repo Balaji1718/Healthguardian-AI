@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeCompletion, testProvider } from './ai-provider-router.js';
 import { executeWebSearch } from './web-search.js';
 import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
+import { sendUserPush } from './firebase-admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,6 +103,67 @@ app.post('/api/ai/improve-transcript', async (req, res) => {
     return res.status(200).json(result);
   } catch {
     return res.status(500).json({ ok: false, error: 'Transcript improvement failed.' });
+  }
+});
+
+app.post('/api/support/email', async (req, res) => {
+  const { type, reason, message, priority, userEmail, userName, requestId } = req.body ?? {};
+  if (typeof reason !== 'string' || !reason.trim()) {
+    return res.status(400).json({ ok: false, error: 'Support summary is required.' });
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return res.status(202).json({ ok: true, delivered: false, reason: 'email_provider_not_configured' });
+  }
+
+  const recipient = process.env.SUPPORT_EMAIL_TO || 'balajiteen18@gmail.com';
+  const text = [
+    `Request ID: ${requestId || 'not provided'}`,
+    `Type: ${type || 'question'}`,
+    `Priority: ${priority || 'normal'}`,
+    `User: ${userName || 'Unknown'}${userEmail ? ` <${userEmail}>` : ''}`,
+    '',
+    `Summary: ${reason.trim()}`,
+    `Details: ${typeof message === 'string' && message.trim() ? message.trim() : 'No additional details.'}`,
+  ].join('\n');
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.SUPPORT_EMAIL_FROM || 'HealthGuardian Support <onboarding@resend.dev>',
+        to: [recipient],
+        subject: `[HealthGuardian support] ${reason.trim()}`,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ ok: false, delivered: false, error: 'Support email delivery failed.' });
+    }
+    return res.status(200).json({ ok: true, delivered: true });
+  } catch {
+    return res.status(502).json({ ok: false, delivered: false, error: 'Support email delivery failed.' });
+  }
+});
+
+app.post('/api/notifications/send', async (req, res) => {
+  if (!process.env.FCM_INTERNAL_SECRET || req.get('x-fcm-internal-secret') !== process.env.FCM_INTERNAL_SECRET) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized.' });
+  }
+  const { uid, title, body, data } = req.body ?? {};
+  if (typeof uid !== 'string' || typeof title !== 'string' || typeof body !== 'string') {
+    return res.status(400).json({ ok: false, error: 'uid, title, and body are required.' });
+  }
+  try {
+    return res.status(200).json({ ok: true, ...(await sendUserPush(uid, title, body, data)) });
+  } catch {
+    return res.status(502).json({ ok: false, error: 'Push delivery failed.' });
   }
 });
 

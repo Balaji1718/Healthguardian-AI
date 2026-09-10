@@ -1,5 +1,16 @@
 import { z } from "zod";
-import type { DailyCheckin } from "@/models";
+const healthObservationSchema = z.object({
+  category: z.string().min(1).max(40),
+  label: z.string().min(1).max(120),
+  valueText: z.string().max(300).nullable().optional(),
+  numericValue: z.number().nullable().optional(),
+  unit: z.string().max(30).nullable().optional(),
+  temporalContext: z.string().max(120).nullable().optional(),
+  severity: z.string().max(30).nullable().optional(),
+  confidence: z.enum(["high", "medium", "low"]),
+  sourceText: z.string().max(500),
+  userConfirmed: z.boolean().default(false),
+});
 
 export const extractedCheckinSchema = z
   .object({
@@ -25,6 +36,7 @@ export const extractedCheckinSchema = z
     fieldConfidence: z.record(z.enum(["high", "medium", "low"])).default({}),
     isAmbiguous: z.boolean().default(false),
     ambiguityReason: z.string().nullable().optional(),
+    observations: z.array(healthObservationSchema).default([]),
   })
   .strict();
 

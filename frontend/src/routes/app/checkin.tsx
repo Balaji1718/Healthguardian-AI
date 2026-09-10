@@ -97,6 +97,7 @@ function Checkin() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [form, setForm] = useState<FormState>(EMPTY);
   const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [observations, setObservations] = useState<DailyCheckin["observations"]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -137,6 +138,7 @@ function Checkin() {
       });
       setSymptoms(existing.symptoms ?? []);
       setSelectedTags(existing.tags ?? []);
+      setObservations(existing.observations ?? []);
     })();
     return () => {
       cancelled = true;
@@ -189,6 +191,7 @@ function Checkin() {
       bloodGlucose: d.bloodGlucose,
       bloodGlucoseUnit: d.bloodGlucose != null ? form["bloodGlucoseUnit"] : undefined,
       notes: form["notes"] || undefined,
+      observations,
       symptoms,
       tags: selectedTags,
       source: activeSource,
@@ -234,6 +237,7 @@ function Checkin() {
       bloodGlucose: d.bloodGlucose,
       bloodGlucoseUnit: d.bloodGlucose != null ? form["bloodGlucoseUnit"] : undefined,
       notes: form["notes"] || undefined,
+      observations,
       symptoms,
       tags: selectedTags,
       source: activeSource,
@@ -298,6 +302,7 @@ function Checkin() {
         bloodGlucoseUnit: extracted.bloodGlucoseUnit ?? "mg/dL",
         notes: extracted.notes ?? cleanText,
       });
+        setObservations(extracted.observations ?? []);
 
       if (extracted.tags && Array.isArray(extracted.tags)) {
         setSelectedTags(extracted.tags);

@@ -22,6 +22,7 @@ import {
   formatNotificationTitle,
 } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
+import { registerWebPush } from "@/services/notifications/webPush";
 
 export const Route = createFileRoute("/app/notifications")({
   component: NotificationsPage,
@@ -52,7 +53,10 @@ export function NotificationsPage() {
 
   const enable = async () => {
     const res = await requestNotificationPermission();
-    if (res === "granted") toast.success(t("common.success"));
+    if (res === "granted") {
+      const push = uid ? await registerWebPush(uid) : { ok: false };
+      toast.success(push.ok ? "Alerts enabled on this device." : "Browser alerts enabled.");
+    }
     else if (res === "unsupported") toast.error(t("common.error"));
     else toast.warning(t("common.offlineNotice"));
   };
@@ -85,23 +89,27 @@ export function NotificationsPage() {
       ) : (
         <ul className="space-y-2">
           {items.map((n) => (
-            <li key={n.id} className="surface flex flex-wrap items-start gap-3 p-4">
-              <Bell className="mt-0.5 size-4 text-primary" />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{formatNotificationTitle(n, t)}</p>
-                <p className="text-sm text-muted-foreground">{formatNotificationMessage(n, t)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {toDate(n.createdAt ?? null)?.toLocaleString() ?? ""}
-                </p>
-              </div>
-              <Badge
-                variant={n.priority === "high" ? "destructive" : "secondary"}
-                className="capitalize"
-              >
-                {formatNotificationPriority(n.priority, t)}
-              </Badge>
-              {n.id && (
-                <div className="flex gap-1">
+            <li key={n.id} className="surface grid gap-3 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-start">
+                <Bell className="mt-0.5 size-4 text-primary" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <p className="min-w-0 flex-1 font-medium">{formatNotificationTitle(n, t)}</p>
+                    <Badge
+                      variant={n.priority === "high" ? "destructive" : "secondary"}
+                      className="shrink-0 capitalize"
+                    >
+                      {formatNotificationPriority(n.priority, t)}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
+                    {formatNotificationMessage(n, t)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {toDate(n.createdAt ?? null)?.toLocaleString() ?? ""}
+                  </p>
+                </div>
+                {n.id && (
+                  <div className="flex flex-wrap gap-1 sm:justify-end">
                   {n.status !== "read" && (
                     <Button
                       size="sm"

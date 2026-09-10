@@ -53,6 +53,18 @@ export const extractionSchema = z.object({
   fieldConfidence: z.record(z.enum(["high", "medium", "low"])).default({}),
   isAmbiguous: z.boolean().default(false),
   ambiguityReason: z.string().nullable().optional(),
+  observations: z.array(z.object({
+    category: z.string().min(1).max(40),
+    label: z.string().min(1).max(120),
+    valueText: z.string().max(300).nullable().optional(),
+    numericValue: z.number().nullable().optional(),
+    unit: z.string().max(30).nullable().optional(),
+    temporalContext: z.string().max(120).nullable().optional(),
+    severity: z.string().max(30).nullable().optional(),
+    confidence: z.enum(["high", "medium", "low"]),
+    sourceText: z.string().max(500),
+    userConfirmed: z.boolean().default(false),
+  })).default([]),
 }).strict();
 
 const SYSTEM_EXTRACTION_PROMPT = `You are an intelligent, empathetic, adaptive health data extraction and natural language understanding assistant for HealthGuardian AI.
@@ -74,8 +86,9 @@ NON-STRICT, CONTEXTUAL NATURAL LANGUAGE UNDERSTANDING:
    - If target language is "ta" (Tamil), write the notes in pure, grammatically sound Tamil script.
    - If target language is "hi" (Hindi), write the notes in pure Devanagari Hindi.
    - If target language is "en" (English), write the notes in natural English.
-6. NEVER generate medical diagnoses or prescribe medications.
-7. Return pure structured JSON matching the schema.`;
+6. Preserve meaningful details that do not fit the canonical metrics in "observations". Each observation must include a concise category, label, original sourceText, confidence, and optional valueText, numericValue, unit, temporalContext, or severity.
+7. NEVER generate medical diagnoses or prescribe medications.
+8. Return pure structured JSON matching the schema.`;
 
 // Tamil Number Word Map (Native + Tanglish / Phonetic)
 const TAMIL_NUMBERS = {
@@ -266,8 +279,8 @@ export function extractWithRules(text, targetLang = "en") {
   }
 
   // Water & Beverages (English, Tamil, Hindi, Tanglish, Hinglish)
-  const waterMatch = norm.match(/(?:drank|drink|had|water|thanni|thanneer|paani|pani)\s*[:=-]?\s*(?:about\s*)?(\d+)\s*(?:glasses|glass|cups|bottles|bottil|g)?\s*(?:of\s*(?:water|thanni))?/i) ||
-                     norm.match(/(\d+)\s*(?:glasses|glass|cups|bottles|bottil|g)\s*(?:of\s*)?(?:water|thanni|thanneer|paani|pani|kaafi|kaapi|coffee|tea|puducherry|kudithen|kudichen|piya)?/i) ||
+  const waterMatch = norm.match(/(?:drank|drink|had|water|thanni|thanneer|paani|pani)\s*[:=-]?\s*(?:about\s*)?(\d+)\s*(?:glasses|glass|cups|bottles|bottil|\bg\b)?\s*(?:of\s*(?:water|thanni))?/i) ||
+                     norm.match(/(\d+)\s*(?:glasses|glass|cups|bottles|bottil|\bg\b)\s*(?:of\s*)?(?:water|thanni|thanneer|paani|pani|kaafi|kaapi|coffee|tea|puducherry|kudithen|kudichen|piya)?/i) ||
                      norm.match(/(?:paani|pani|water|thanni|thanneer)\s*(\d+)\s*(?:glasses|glass|cups|bottles)?/i) ||
                      norm.match(/(\d+)\s*(?:கிளாஸ்|டம்ளர்|குவளை|பாட்டில்)\s*(?:தண்ணீர்|காபி|டீ)?/) ||
                      norm.match(/(?:தண்ணீர்|காபி|டீ)\s*(\d+)\s*(?:கிளாஸ்|டம்ளர்|குவளை|பாட்டில்)?/) ||

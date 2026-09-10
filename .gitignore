@@ -17,13 +17,16 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
-render-env-values.local.txt
-
 # Environment files (keep example tracked, keep real values local only)
 .env
 **/.env
 .env.*
 **/.env.*
+*service-account*.json
+**/*service-account*.json
+*credentials*.json
+**/*credentials*.json
+render-env-values.local.txt
 !.env.example
 !**/.env.example
 
