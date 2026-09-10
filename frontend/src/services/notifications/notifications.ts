@@ -77,11 +77,58 @@ export async function showBrowserNotification(title: string, body: string): Prom
   }
 }
 
+export async function dispatchServerPush(
+  uid: string,
+  title: string,
+  body: string,
+  data: Record<string, string> = {},
+): Promise<{ ok: boolean; delivered?: boolean; reason?: string }> {
+  try {
+    const res = await fetch("/api/notifications/dispatch-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, title, body, data }),
+    });
+    if (!res.ok) {
+      return { ok: false, reason: "http_" + res.status };
+    }
+    const json = await res.json();
+    return { ok: Boolean(json.ok), delivered: Boolean(json.delivered), reason: json.reason };
+  } catch (err) {
+    return { ok: false, reason: (err as Error).message };
+  }
+}
+
+export async function scheduleServerTestPush(
+  uid: string,
+  delaySeconds = 10,
+  lang = "en",
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch("/api/notifications/schedule-test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, delaySeconds, lang }),
+    });
+    if (!res.ok) return { ok: false, message: "Could not schedule server push." };
+    const json = await res.json();
+    return { ok: Boolean(json.ok), message: json.message };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
+}
+
 export async function pushNotification(
   uid: string,
   n: Omit<AppNotification, "status"> & { status?: AppNotification["status"] },
 ) {
-  const delivered = await showBrowserNotification(n.title, n.message);
+  const serverPush = await dispatchServerPush(uid, n.title, n.message, {
+    type: n.type || "health_alert",
+    url: "/app/notifications",
+  });
+  const localDelivered = await showBrowserNotification(n.title, n.message);
+  const delivered = Boolean(serverPush.delivered || localDelivered);
+
   return createNotification(uid, {
     ...n,
     status: delivered ? "delivered" : (n.status ?? "pending"),
@@ -98,13 +145,22 @@ export async function sendTestNotification(uid: string, lang = "en"): Promise<bo
   const bodies: Record<string, string> = {
     en: "Notifications are working properly on this device. You will receive health reminders and trend insights here.",
     ta: "இந்தச் சாதனத்தில் அறிவிப்புகள் சரியாகச் செயல்படுகின்றன. உங்கள் சுகாதார நினைவூட்டல்கள் இங்கே தோன்றும்.",
-    hi: "इस डिवाइस पर सूचनाएं ठीक से काम कर रही हैं। आपको स्वास्थ्य अनुस्मारक यहां प्राप्त होंगे।",
+    hi: "इस डिवाइस पर सूचनाएं ठीक से काम कर रही हैं। உங்களுக்கு சுகாதார நினைவூட்டல்கள் இங்கே தோன்றும்.",
   };
 
   const title = titles[lang] || titles.en;
   const message = bodies[lang] || bodies.en;
 
-  const delivered = await showBrowserNotification(title, message);
+  // 1. Dispatch real server FCM push through Google push servers to registered device tokens
+  const serverPush = await dispatchServerPush(uid, title, message, {
+    type: "test_alert",
+    url: "/app/notifications",
+  });
+
+  // 2. Also trigger local browser notification for immediate active window response
+  const localDelivered = await showBrowserNotification(title, message);
+  const delivered = Boolean(serverPush.delivered || localDelivered);
+
   if (uid) {
     await createNotification(uid, {
       type: "reminder",
@@ -121,14 +177,13 @@ export async function sendTestNotification(uid: string, lang = "en"): Promise<bo
 
 export function scheduleDelayedNotification(
   uid: string,
-  delaySeconds = 5,
+  delaySeconds = 10,
   lang = "en",
   onDelivered?: (delivered: boolean) => void,
 ): void {
-  setTimeout(async () => {
-    const delivered = await sendTestNotification(uid, lang);
-    onDelivered?.(delivered);
-  }, delaySeconds * 1000);
+  void scheduleServerTestPush(uid, delaySeconds, lang).then((res) => {
+    onDelivered?.(res.ok);
+  });
 }
 
 const DEDUPE_KEY = "hg_pattern_alerts";

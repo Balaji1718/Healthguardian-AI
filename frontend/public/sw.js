@@ -4,7 +4,7 @@ importScripts("https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "AIzaSyAxktJXjwdMsqYN0rXBtF-C1AQQVBeT8Dg",
+  apiKey: "AIzaSyAxktjXJwdMsqYN0rXBtF-C1AQQVBeT8Dg",
   authDomain: "healthguardian-ai-6d525.firebaseapp.com",
   projectId: "healthguardian-ai-6d525",
   messagingSenderId: "314747195030",
@@ -20,8 +20,10 @@ messaging.onBackgroundMessage((payload) => {
     body,
     icon: "/pwa-192.png",
     badge: "/pwa-192.png",
+    vibrate: [200, 100, 200],
+    requireInteraction: true,
     tag: payload.data?.tag || "healthguardian-alert",
-    data: payload.data || {},
+    data: payload.data || { url: "/app/notifications" },
   });
 });
 
@@ -35,15 +37,19 @@ self.addEventListener("push", (event) => {
       data = { body: event.data.text() };
     }
   }
-  const title = data.notification?.title || data.title || "HealthGuardian AI";
-  const body = data.notification?.body || data.body || "You have a new health reminder or alert.";
+  const title = data.notification?.title || data.data?.title || data.title || "HealthGuardian AI";
+  const body = data.notification?.body || data.data?.body || data.body || "You have a new health reminder or alert.";
+  const clickUrl = data.data?.url || data.fcmOptions?.link || "/app/notifications";
+
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
       icon: "/pwa-192.png",
       badge: "/pwa-192.png",
-      tag: data.tag || "healthguardian-alert",
-      data: data.data || data,
+      vibrate: [200, 100, 200],
+      requireInteraction: true,
+      tag: data.data?.tag || data.tag || "healthguardian-alert",
+      data: { url: clickUrl, ...(data.data || {}) },
     }),
   );
 });

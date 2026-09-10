@@ -55,7 +55,21 @@ export async function sendUserPush(uid, title, body, data = {}) {
     notification: { title, body },
     data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
     webpush: {
+      headers: {
+        Urgency: "high",
+        TTL: "86400",
+      },
+      notification: {
+        title,
+        body,
+        icon: "/pwa-192.png",
+        badge: "/pwa-192.png",
+        requireInteraction: true,
+      },
       fcmOptions: { link: "/app/notifications" },
+    },
+    android: {
+      priority: "high",
     },
   });
 

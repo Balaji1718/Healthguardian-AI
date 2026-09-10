@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -31,7 +31,7 @@ import {
   notificationPermission,
   requestNotificationPermission,
   sendTestNotification,
-  scheduleDelayedNotification,
+  scheduleServerTestPush,
 } from "@/services/notifications/notifications";
 import { toDate } from "@/services/firebase/repositories";
 import { ContextualHelp } from "@/features/guide/ContextualHelp";
@@ -41,7 +41,7 @@ import {
   formatNotificationTitle,
 } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
-import { registerWebPush } from "@/services/notifications/webPush";
+import { ensureWebPushSubscribed, registerWebPush } from "@/services/notifications/webPush";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/notifications")({
@@ -72,6 +72,13 @@ export function NotificationsPage() {
 
   const permission = notificationPermission();
 
+  // Auto-sync FCM device token when permission is granted
+  useEffect(() => {
+    if (uid && permission === "granted") {
+      void ensureWebPushSubscribed(uid);
+    }
+  }, [uid, permission]);
+
   const enable = async () => {
     const res = await requestNotificationPermission();
     if (res === "granted") {
@@ -100,24 +107,33 @@ export function NotificationsPage() {
         toast.warning("Please grant notification permission in browser settings to receive alerts.");
         return;
       }
+    } else {
+      await ensureWebPushSubscribed(uid);
     }
 
     if (delayed) {
-      toast.info("Sending test alert in 5s! Lock your screen or switch apps now to test background wake...", {
-        duration: 4800,
-      });
-      scheduleDelayedNotification(uid, 5, language, () => {
-        void qc.invalidateQueries({ queryKey: ["notifications"] });
-      });
+      setIsProcessing(true);
+      try {
+        const res = await scheduleServerTestPush(uid, 10, language);
+        if (res.ok) {
+          toast.success("Server scheduled FCM push in 10s! Clear app from Recent Apps & lock your phone now!", {
+            duration: 9000,
+          });
+        } else {
+          toast.error("Could not schedule server push.");
+        }
+      } finally {
+        setIsProcessing(false);
+      }
     } else {
       setIsProcessing(true);
       try {
         const delivered = await sendTestNotification(uid, language);
         await qc.invalidateQueries({ queryKey: ["notifications"] });
         if (delivered) {
-          toast.success("Test notification delivered! Check your notification tray.");
+          toast.success("Server FCM push dispatched! Check your device notification shade.");
         } else {
-          toast.info("Notification added to your in-app tray. Enable device popups to see lock screen alerts.");
+          toast.info("Notification added to your in-app tray. Enable device alerts to see system popups.");
         }
       } catch {
         toast.error("Could not send test alert.");
@@ -234,9 +250,9 @@ export function NotificationsPage() {
               >
                 <Sparkles className="size-4 text-primary" />
                 <div>
-                  <span className="font-semibold block">Send Instant Alert</span>
+                  <span className="font-semibold block">Instant Server FCM Push</span>
                   <span className="text-[10px] text-muted-foreground">
-                    Shows immediate notification on device
+                    Dispatches live FCM push from backend server
                   </span>
                 </div>
               </DropdownMenuItem>
@@ -246,9 +262,9 @@ export function NotificationsPage() {
               >
                 <Clock className="size-4 text-amber-500" />
                 <div>
-                  <span className="font-semibold block">Send in 5s (Test Closed App)</span>
+                  <span className="font-semibold block">Test Closed App (10s Delay)</span>
                   <span className="text-[10px] text-muted-foreground">
-                    Lock phone or minimize app to test background wake
+                    Clear app from Recent Apps & lock phone — server pushes in 10s
                   </span>
                 </div>
               </DropdownMenuItem>

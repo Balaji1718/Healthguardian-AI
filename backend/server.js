@@ -167,6 +167,60 @@ app.post('/api/notifications/send', async (req, res) => {
   }
 });
 
+app.post('/api/notifications/dispatch-push', async (req, res) => {
+  const { uid, title, body, data } = req.body ?? {};
+  if (typeof uid !== 'string' || typeof title !== 'string' || typeof body !== 'string') {
+    return res.status(400).json({ ok: false, error: 'uid, title, and body are required.' });
+  }
+  try {
+    const pushResult = await sendUserPush(uid, title, body, data);
+    return res.status(200).json({ ok: true, ...pushResult });
+  } catch (err) {
+    return res.status(502).json({ ok: false, error: 'Push delivery failed: ' + err.message });
+  }
+});
+
+app.post('/api/notifications/schedule-test-push', async (req, res) => {
+  const { uid, delaySeconds = 10, lang = 'en' } = req.body ?? {};
+  if (typeof uid !== 'string') {
+    return res.status(400).json({ ok: false, error: 'uid is required.' });
+  }
+
+  const titles = {
+    en: 'HealthGuardian AI Background Alert',
+    ta: 'HealthGuardian AI பின்னணி எச்சரிக்கை',
+    hi: 'HealthGuardian AI पृष्ठभूमि चेतावनी',
+  };
+  const bodies = {
+    en: 'FCM push delivered successfully while the app was closed from recent apps!',
+    ta: 'செயலி மூடப்பட்டிருந்தாலும் FCM புஷ் வெற்றிகரமாக வழங்கப்பட்டது!',
+    hi: 'ऐप बंद होने पर भी FCM पुश सफलतापूर्वक प्राप्त हुआ!',
+  };
+
+  const title = titles[lang] || titles.en;
+  const body = bodies[lang] || bodies.en;
+  const delay = Math.max(1, Math.min(60, Number(delaySeconds) || 10));
+
+  res.status(200).json({
+    ok: true,
+    scheduled: true,
+    delaySeconds: delay,
+    message: `Server scheduled FCM push in ${delay}s. You can now close or clear the app from Recent Apps!`,
+  });
+
+  setTimeout(async () => {
+    try {
+      await sendUserPush(uid, title, body, {
+        type: 'test_alert',
+        scheduled: 'true',
+        deliveredAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Scheduled push error:', err.message);
+    }
+  }, delay * 1000);
+});
+
 app.get('/api/ai/diagnostics', async (_req, res) => {
   const results = [];
   for (const provider of PROVIDER_REGISTRY) {
