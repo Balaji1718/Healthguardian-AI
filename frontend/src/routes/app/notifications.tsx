@@ -17,6 +17,12 @@ import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUid } from "@/features/auth/useAuth";
 import { useNotificationsQuery } from "@/features/health/queries";
 import {
@@ -24,6 +30,8 @@ import {
   markRead,
   notificationPermission,
   requestNotificationPermission,
+  sendTestNotification,
+  scheduleDelayedNotification,
 } from "@/services/notifications/notifications";
 import { toDate } from "@/services/firebase/repositories";
 import { ContextualHelp } from "@/features/guide/ContextualHelp";
@@ -57,7 +65,7 @@ export const Route = createFileRoute("/app/notifications")({
 export function NotificationsPage() {
   const uid = useUid();
   const qc = useQueryClient();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { data, isLoading, isError, refetch } = useNotificationsQuery(uid);
   const [filter, setFilter] = useState<"all" | "unread" | "high">("all");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,6 +81,49 @@ export function NotificationsPage() {
       toast.error(t("common.error"));
     } else {
       toast.warning(t("common.offlineNotice"));
+    }
+  };
+
+  const handleTestNotification = async (delayed = false) => {
+    if (!uid) {
+      toast.error("Please log in to test notifications.");
+      return;
+    }
+
+    let currentPermission = notificationPermission();
+    if (currentPermission !== "granted") {
+      const res = await requestNotificationPermission();
+      if (res === "granted") {
+        await registerWebPush(uid);
+        currentPermission = "granted";
+      } else {
+        toast.warning("Please grant notification permission in browser settings to receive alerts.");
+        return;
+      }
+    }
+
+    if (delayed) {
+      toast.info("Sending test alert in 5s! Lock your screen or switch apps now to test background wake...", {
+        duration: 4800,
+      });
+      scheduleDelayedNotification(uid, 5, language, () => {
+        void qc.invalidateQueries({ queryKey: ["notifications"] });
+      });
+    } else {
+      setIsProcessing(true);
+      try {
+        const delivered = await sendTestNotification(uid, language);
+        await qc.invalidateQueries({ queryKey: ["notifications"] });
+        if (delivered) {
+          toast.success("Test notification delivered! Check your notification tray.");
+        } else {
+          toast.info("Notification added to your in-app tray. Enable device popups to see lock screen alerts.");
+        }
+      } catch {
+        toast.error("Could not send test alert.");
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -163,17 +214,46 @@ export function NotificationsPage() {
 
         <div className="flex items-center gap-1.5">
           <ContextualHelp content="Alerts are for awareness, not emergency monitoring. Notifications never expose private clinical details." />
-          {permission !== "granted" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void enable()}
-              className="h-8 text-xs gap-1.5 rounded-full touch-press"
-            >
-              <BellRing className="size-3.5" />
-              <span className="hidden sm:inline">{t("notifications.enableAlerts")}</span>
-            </Button>
-          )}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={permission === "granted" ? "outline" : "default"}
+                size="sm"
+                className="h-8 text-xs gap-1.5 rounded-full touch-press shadow-xs"
+                disabled={isProcessing}
+              >
+                <BellRing className="size-3.5" />
+                <span>{permission === "granted" ? "Test Alert" : t("notifications.enableAlerts")}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 text-xs">
+              <DropdownMenuItem
+                onClick={() => void handleTestNotification(false)}
+                className="gap-2.5 py-2 cursor-pointer"
+              >
+                <Sparkles className="size-4 text-primary" />
+                <div>
+                  <span className="font-semibold block">Send Instant Alert</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Shows immediate notification on device
+                  </span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => void handleTestNotification(true)}
+                className="gap-2.5 py-2 cursor-pointer"
+              >
+                <Clock className="size-4 text-amber-500" />
+                <div>
+                  <span className="font-semibold block">Send in 5s (Test Closed App)</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Lock phone or minimize app to test background wake
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

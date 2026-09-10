@@ -47,7 +47,9 @@ export async function showBrowserNotification(title: string, body: string): Prom
           body,
           icon: APP_NOTIFICATION_ICON,
           badge: APP_NOTIFICATION_ICON,
+          vibrate: [200, 100, 200],
           tag: "healthguardian-alert",
+          data: { url: "/app/notifications" },
         });
         return true;
       }
@@ -58,7 +60,17 @@ export async function showBrowserNotification(title: string, body: string): Prom
 
   // 2. Desktop Notification API fallback
   try {
-    new Notification(title, { body, icon: APP_NOTIFICATION_ICON, tag: "healthguardian-alert" });
+    const notif = new Notification(title, {
+      body,
+      icon: APP_NOTIFICATION_ICON,
+      tag: "healthguardian-alert",
+    });
+    notif.onclick = () => {
+      window.focus();
+      if (window.location.pathname !== "/app/notifications") {
+        window.location.href = "/app/notifications";
+      }
+    };
     return true;
   } catch {
     return false;
@@ -105,6 +117,18 @@ export async function sendTestNotification(uid: string, lang = "en"): Promise<bo
     } as AppNotification);
   }
   return delivered;
+}
+
+export function scheduleDelayedNotification(
+  uid: string,
+  delaySeconds = 5,
+  lang = "en",
+  onDelivered?: (delivered: boolean) => void,
+): void {
+  setTimeout(async () => {
+    const delivered = await sendTestNotification(uid, lang);
+    onDelivered?.(delivered);
+  }, delaySeconds * 1000);
 }
 
 const DEDUPE_KEY = "hg_pattern_alerts";
