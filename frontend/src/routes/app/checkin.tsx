@@ -293,20 +293,30 @@ function Checkin() {
     }
   };
 
+  // Update a single check-in form field in place without restarting session
+  const handleUpdateField = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
   // Confirm and save checkin to Firestore with full cross-screen reactive invalidation
   const handleConfirmSave = async (includedData?: Partial<DailyCheckin>) => {
     if (!uid || busy) return;
-    const fallbackData = validateAndGetParsedData();
-    const dataToSave = includedData || fallbackData;
-    if (!dataToSave) return;
-
     setBusy(true);
+
     try {
+      const fallbackData = getParsedData();
+      const dataToSave = includedData || fallbackData;
+      if (!dataToSave || Object.keys(dataToSave).length === 0) {
+        toast.error("No valid check-in data to save. Please review your entries.");
+        return;
+      }
+
       await saveCheckin(uid, new Date(`${date}T00:00:00`), {
         ...dataToSave,
         source: activeSource,
         verificationStatus: "user_verified",
       });
+
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["checkins"] }),
         qc.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -316,13 +326,15 @@ function Checkin() {
         qc.invalidateQueries({ queryKey: ["notifications"] }),
         qc.invalidateQueries({ queryKey: ["guidance"] }),
       ]);
+
       toast.success(
         online
           ? "Today's check-in was saved."
           : "Saved locally — it will sync when you are back online.",
       );
       await navigate({ to: "/app/dashboard" });
-    } catch {
+    } catch (err) {
+      console.error("Failed to save check-in:", err);
       toast.error("Could not save your check-in. Please try again.");
     } finally {
       setBusy(false);
@@ -462,7 +474,7 @@ function Checkin() {
           inputUtterance={rawInputUtterance}
           analysis={analysisResult}
           interpretation={interpretationResult}
-          onEdit={() => setMode("composer")}
+          onUpdateField={handleUpdateField}
           onConfirm={handleConfirmSave}
           busy={busy}
         />

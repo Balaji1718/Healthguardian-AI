@@ -26,13 +26,25 @@ export const MAX_RETRIES_PER_PROVIDER = 1; // 1 retry = max 2 attempts per provi
 
 export const PROVIDER_REGISTRY = [
   {
+    id: "openai",
+    displayName: "OpenAI",
+    keyEnv: "OPENAI_API_KEY",
+    modelEnv: "OPENAI_MODEL",
+    baseUrl: "https://api.openai.com/v1/chat/completions",
+    defaultModel: "gpt-4o-mini",
+    priority: 1,
+    format: "openai",
+    supportsToolCalling: true,
+    supportsStructuredOutput: true,
+  },
+  {
     id: "openrouter",
     displayName: "OpenRouter",
     keyEnv: "OPENROUTER_API_KEY",
     modelEnv: "OPENROUTER_MODEL",
     baseUrl: "https://openrouter.ai/api/v1/chat/completions",
     defaultModel: "openrouter/free",
-    priority: 1,
+    priority: 2,
     format: "openai",
     supportsToolCalling: true,
     supportsStructuredOutput: true,

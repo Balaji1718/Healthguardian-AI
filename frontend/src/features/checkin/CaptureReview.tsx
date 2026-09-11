@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   CheckCircle2,
   Edit3,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { formatSymptom } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
 import type { CheckinSource, DailyCheckin } from "@/models";
@@ -38,8 +39,9 @@ export interface CaptureReviewProps {
     riskPatterns?: string[];
     historySuggestions?: string[];
   } | null;
-  onEdit: () => void;
+  onEdit?: () => void;
   onConfirm: (includedData?: Partial<DailyCheckin>) => Promise<void>;
+  onUpdateField?: (field: string, value: string) => void;
   busy: boolean;
 }
 
@@ -65,10 +67,24 @@ export function CaptureReview({
   analysis,
   onEdit,
   onConfirm,
+  onUpdateField,
   busy,
 }: CaptureReviewProps) {
   const { t } = useTranslation();
   const [showAdditionalMetrics, setShowAdditionalMetrics] = useState(false);
+
+  // Local review state holding current confirmed/edited values
+  const [editedValues, setEditedValues] = useState<Partial<DailyCheckin>>(() => ({ ...data }));
+  // Track which field is currently being edited in-place: null | fieldId
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [draftValue, setDraftValue] = useState<string>("");
+  const [draftSecondary, setDraftSecondary] = useState<string>("");
+
+  // Synchronize when parent data updates
+  useEffect(() => {
+    setEditedValues((prev) => ({ ...data, ...prev }));
+  }, [data]);
+
   // Track which fields the user has explicitly selected/included for save
   const [includedFields, setIncludedFields] = useState<Record<string, boolean>>({
     date: true,
@@ -92,9 +108,125 @@ export function CaptureReview({
     }));
   };
 
-  const wellbeingObj = data.wellbeing ? WELLBEING_LABELS[data.wellbeing] : undefined;
+  const startEditField = (fieldId: string) => {
+    let initialVal = "";
+    let secondaryVal = "";
 
-  // Build field review items
+    switch (fieldId) {
+      case "sleepHours":
+        initialVal = editedValues.sleepHours != null ? String(editedValues.sleepHours) : "";
+        break;
+      case "waterGlasses":
+        initialVal = editedValues.waterGlasses != null ? String(editedValues.waterGlasses) : "";
+        break;
+      case "exerciseMinutes":
+        initialVal = editedValues.exerciseMinutes != null ? String(editedValues.exerciseMinutes) : "";
+        secondaryVal = editedValues.exerciseType || "";
+        break;
+      case "weightKg":
+        initialVal = editedValues.weightKg != null ? String(editedValues.weightKg) : "";
+        break;
+      case "bloodPressure":
+        initialVal = editedValues.systolicBP != null ? String(editedValues.systolicBP) : "";
+        secondaryVal = editedValues.diastolicBP != null ? String(editedValues.diastolicBP) : "";
+        break;
+      case "bloodGlucose":
+        initialVal = editedValues.bloodGlucose != null ? String(editedValues.bloodGlucose) : "";
+        secondaryVal = editedValues.bloodGlucoseUnit || "mg/dL";
+        break;
+      case "wellbeing":
+        initialVal = editedValues.wellbeing || "good";
+        break;
+      case "notes":
+        initialVal = editedValues.notes || "";
+        break;
+      default:
+        initialVal = "";
+    }
+
+    setDraftValue(initialVal);
+    setDraftSecondary(secondaryVal);
+    setEditingFieldId(fieldId);
+  };
+
+  const cancelEdit = () => {
+    setEditingFieldId(null);
+    setDraftValue("");
+    setDraftSecondary("");
+  };
+
+  const saveEditField = (fieldId: string) => {
+    const updated = { ...editedValues };
+
+    switch (fieldId) {
+      case "sleepHours": {
+        const val = draftValue.trim();
+        const num = val ? parseFloat(val) : null;
+        updated.sleepHours = num != null && !isNaN(num) ? num : null;
+        onUpdateField?.("sleepHours", updated.sleepHours != null ? String(updated.sleepHours) : "");
+        break;
+      }
+      case "waterGlasses": {
+        const val = draftValue.trim();
+        const num = val ? parseInt(val, 10) : null;
+        updated.waterGlasses = num != null && !isNaN(num) ? num : null;
+        onUpdateField?.("waterGlasses", updated.waterGlasses != null ? String(updated.waterGlasses) : "");
+        break;
+      }
+      case "exerciseMinutes": {
+        const val = draftValue.trim();
+        const num = val ? parseInt(val, 10) : null;
+        updated.exerciseMinutes = num != null && !isNaN(num) ? num : null;
+        updated.exerciseType = draftSecondary.trim() || undefined;
+        onUpdateField?.("exerciseMinutes", updated.exerciseMinutes != null ? String(updated.exerciseMinutes) : "");
+        onUpdateField?.("exerciseType", updated.exerciseType || "");
+        break;
+      }
+      case "weightKg": {
+        const val = draftValue.trim();
+        const num = val ? parseFloat(val) : null;
+        updated.weightKg = num != null && !isNaN(num) ? num : null;
+        onUpdateField?.("weightKg", updated.weightKg != null ? String(updated.weightKg) : "");
+        break;
+      }
+      case "bloodPressure": {
+        const sys = draftValue.trim() ? parseInt(draftValue.trim(), 10) : null;
+        const dia = draftSecondary.trim() ? parseInt(draftSecondary.trim(), 10) : null;
+        updated.systolicBP = sys != null && !isNaN(sys) ? sys : null;
+        updated.diastolicBP = dia != null && !isNaN(dia) ? dia : null;
+        onUpdateField?.("systolicBP", updated.systolicBP != null ? String(updated.systolicBP) : "");
+        onUpdateField?.("diastolicBP", updated.diastolicBP != null ? String(updated.diastolicBP) : "");
+        break;
+      }
+      case "bloodGlucose": {
+        const val = draftValue.trim();
+        const num = val ? parseFloat(val) : null;
+        updated.bloodGlucose = num != null && !isNaN(num) ? num : null;
+        updated.bloodGlucoseUnit = draftSecondary.trim() || "mg/dL";
+        onUpdateField?.("bloodGlucose", updated.bloodGlucose != null ? String(updated.bloodGlucose) : "");
+        onUpdateField?.("bloodGlucoseUnit", updated.bloodGlucoseUnit);
+        break;
+      }
+      case "wellbeing": {
+        updated.wellbeing = draftValue.trim() || undefined;
+        onUpdateField?.("wellbeing", updated.wellbeing || "");
+        break;
+      }
+      case "notes": {
+        updated.notes = draftValue.trim() || undefined;
+        onUpdateField?.("notes", updated.notes || "");
+        break;
+      }
+    }
+
+    setEditedValues(updated);
+    setIncludedFields((prev) => ({ ...prev, [fieldId]: true }));
+    setEditingFieldId(null);
+  };
+
+  const wellbeingObj = editedValues.wellbeing ? WELLBEING_LABELS[editedValues.wellbeing] : undefined;
+
+  // Build field review items using local edited values
   const items = useMemo(
     () => [
       {
@@ -109,11 +241,11 @@ export function CaptureReview({
         id: "wellbeing",
         label: t("checkin.howYouFeel"),
         value: wellbeingObj
-          ? `${wellbeingObj.icon} ${t(`wellbeing.${data.wellbeing}`) || wellbeingObj.label}`
-          : data.wellbeing
-            ? t(`wellbeing.${data.wellbeing}`) || data.wellbeing
+          ? `${wellbeingObj.icon} ${t(`wellbeing.${editedValues.wellbeing}`) || wellbeingObj.label}`
+          : editedValues.wellbeing
+            ? t(`wellbeing.${editedValues.wellbeing}`) || editedValues.wellbeing
             : t("dashboard.notLogged"),
-        hasValue: Boolean(data.wellbeing),
+        hasValue: Boolean(editedValues.wellbeing),
         canExclude: true,
         confidence: fieldConfidence.wellbeing || "high",
       },
@@ -121,10 +253,10 @@ export function CaptureReview({
         id: "sleepHours",
         label: t("dashboard.sleep"),
         value:
-          data.sleepHours != null
-            ? `${data.sleepHours} ${t("units.hours")}`
+          editedValues.sleepHours != null
+            ? `${editedValues.sleepHours} ${t("units.hours")}`
             : t("dashboard.notLogged"),
-        hasValue: data.sleepHours != null,
+        hasValue: editedValues.sleepHours != null,
         canExclude: true,
         confidence: fieldConfidence.sleepHours || "high",
       },
@@ -132,10 +264,10 @@ export function CaptureReview({
         id: "waterGlasses",
         label: t("dashboard.water"),
         value:
-          data.waterGlasses != null
-            ? `${data.waterGlasses} ${t("units.glasses")}`
+          editedValues.waterGlasses != null
+            ? `${editedValues.waterGlasses} ${t("units.glasses")}`
             : t("dashboard.notLogged"),
-        hasValue: data.waterGlasses != null,
+        hasValue: editedValues.waterGlasses != null,
         canExclude: true,
         confidence: fieldConfidence.waterGlasses || "high",
       },
@@ -143,10 +275,10 @@ export function CaptureReview({
         id: "exerciseMinutes",
         label: t("dashboard.exercise"),
         value:
-          data.exerciseMinutes != null
-            ? `${data.exerciseMinutes} ${t("units.mins")} ${data.exerciseType ? `(${data.exerciseType})` : ""}`
+          editedValues.exerciseMinutes != null
+            ? `${editedValues.exerciseMinutes} ${t("units.mins")} ${editedValues.exerciseType ? `(${editedValues.exerciseType})` : ""}`
             : t("dashboard.notLogged"),
-        hasValue: data.exerciseMinutes != null,
+        hasValue: editedValues.exerciseMinutes != null,
         canExclude: true,
         confidence: fieldConfidence.exerciseMinutes || "high",
       },
@@ -154,8 +286,8 @@ export function CaptureReview({
         id: "weightKg",
         label: t("dashboard.weight"),
         value:
-          data.weightKg != null ? `${data.weightKg} ${t("units.kg")}` : t("dashboard.notLogged"),
-        hasValue: data.weightKg != null,
+          editedValues.weightKg != null ? `${editedValues.weightKg} ${t("units.kg")}` : t("dashboard.notLogged"),
+        hasValue: editedValues.weightKg != null,
         canExclude: true,
         confidence: fieldConfidence.weightKg || "high",
       },
@@ -163,10 +295,10 @@ export function CaptureReview({
         id: "bloodPressure",
         label: t("dashboard.bloodPressure"),
         value:
-          data.systolicBP != null && data.diastolicBP != null
-            ? `${data.systolicBP}/${data.diastolicBP} ${t("units.mmHg")}`
+          editedValues.systolicBP != null && editedValues.diastolicBP != null
+            ? `${editedValues.systolicBP}/${editedValues.diastolicBP} ${t("units.mmHg")}`
             : t("dashboard.notLogged"),
-        hasValue: data.systolicBP != null && data.diastolicBP != null,
+        hasValue: editedValues.systolicBP != null && editedValues.diastolicBP != null,
         canExclude: true,
         confidence: fieldConfidence.systolicBP || "high",
       },
@@ -174,15 +306,15 @@ export function CaptureReview({
         id: "bloodGlucose",
         label: t("dashboard.bloodGlucose"),
         value:
-          data.bloodGlucose != null
-            ? `${data.bloodGlucose} ${data.bloodGlucoseUnit || "mg/dL"}`
+          editedValues.bloodGlucose != null
+            ? `${editedValues.bloodGlucose} ${editedValues.bloodGlucoseUnit || "mg/dL"}`
             : t("dashboard.notLogged"),
-        hasValue: data.bloodGlucose != null,
+        hasValue: editedValues.bloodGlucose != null,
         canExclude: true,
         confidence: fieldConfidence.bloodGlucose || "high",
       },
     ],
-    [date, data, wellbeingObj, fieldConfidence, t],
+    [date, editedValues, wellbeingObj, fieldConfidence, t],
   );
 
   const loggedItems = useMemo(() => items.filter((i) => i.hasValue), [items]);
@@ -192,20 +324,21 @@ export function CaptureReview({
   const handleConfirmAction = async () => {
     const finalPayload: Partial<DailyCheckin> = {
       date,
-      wellbeing: includedFields.wellbeing ? (data.wellbeing ?? null) : null,
-      sleepHours: includedFields.sleepHours ? (data.sleepHours ?? null) : null,
-      waterGlasses: includedFields.waterGlasses ? (data.waterGlasses ?? null) : null,
-      exerciseMinutes: includedFields.exerciseMinutes ? (data.exerciseMinutes ?? null) : null,
-      exerciseType: includedFields.exerciseMinutes ? (data.exerciseType ?? null) : null,
-      weightKg: includedFields.weightKg ? (data.weightKg ?? null) : null,
-      systolicBP: includedFields.bloodPressure ? (data.systolicBP ?? null) : null,
-      diastolicBP: includedFields.bloodPressure ? (data.diastolicBP ?? null) : null,
-      bloodGlucose: includedFields.bloodGlucose ? (data.bloodGlucose ?? null) : null,
-      bloodGlucoseUnit: data.bloodGlucoseUnit ?? "mg/dL",
-      symptoms: includedFields.symptoms ? (data.symptoms ?? []) : [],
-      tags: includedFields.tags ? (data.tags ?? []) : [],
-      notes: includedFields.notes ? (data.notes ?? null) : null,
-      observations: includedFields.observations ? (data.observations ?? []) : [],
+      wellbeing: includedFields.wellbeing ? (editedValues.wellbeing ?? null) : null,
+      sleepHours: includedFields.sleepHours ? (editedValues.sleepHours ?? null) : null,
+      waterGlasses: includedFields.waterGlasses ? (editedValues.waterGlasses ?? null) : null,
+      exerciseMinutes: includedFields.exerciseMinutes ? (editedValues.exerciseMinutes ?? null) : null,
+      exerciseType: includedFields.exerciseMinutes ? (editedValues.exerciseType ?? null) : null,
+      foodQuality: editedValues.foodQuality ?? null,
+      weightKg: includedFields.weightKg ? (editedValues.weightKg ?? null) : null,
+      systolicBP: includedFields.bloodPressure ? (editedValues.systolicBP ?? null) : null,
+      diastolicBP: includedFields.bloodPressure ? (editedValues.diastolicBP ?? null) : null,
+      bloodGlucose: includedFields.bloodGlucose ? (editedValues.bloodGlucose ?? null) : null,
+      bloodGlucoseUnit: editedValues.bloodGlucoseUnit ?? "mg/dL",
+      symptoms: includedFields.symptoms ? (editedValues.symptoms ?? []) : [],
+      tags: includedFields.tags ? (editedValues.tags ?? []) : [],
+      notes: includedFields.notes ? (editedValues.notes ?? null) : null,
+      observations: includedFields.observations ? (editedValues.observations ?? []) : [],
     };
 
     await onConfirm(finalPayload);
@@ -245,6 +378,127 @@ export function CaptureReview({
   const renderFieldItem = (item: (typeof items)[0]) => {
     const isIncluded = includedFields[item.id] ?? true;
     const isHighlighted = item.hasValue && isIncluded;
+    const isEditing = editingFieldId === item.id;
+
+    if (isEditing) {
+      return (
+        <div
+          key={item.id}
+          className="p-3 rounded-xl border border-primary/50 bg-card shadow-sm space-y-2 col-span-1"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-primary">{item.label}</span>
+            <span className="text-[10px] text-muted-foreground">Editing value</span>
+          </div>
+
+          {item.id === "wellbeing" ? (
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(WELLBEING_LABELS).map(([k, v]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setDraftValue(k)}
+                  className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
+                    draftValue === k
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/40 border-border text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {v.icon} {v.label}
+                </button>
+              ))}
+            </div>
+          ) : item.id === "exerciseMinutes" ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="600"
+                  value={draftValue}
+                  onChange={(e) => setDraftValue(e.target.value)}
+                  placeholder="Minutes"
+                  className="h-8 text-xs"
+                  autoFocus
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">mins</span>
+              </div>
+              <Input
+                type="text"
+                value={draftSecondary}
+                onChange={(e) => setDraftSecondary(e.target.value)}
+                placeholder="Activity type (e.g. Walking, Gym)"
+                className="h-8 text-xs"
+              />
+            </div>
+          ) : item.id === "bloodPressure" ? (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                min="50"
+                max="250"
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                placeholder="Systolic (120)"
+                className="h-8 text-xs"
+                autoFocus
+              />
+              <span className="text-xs text-muted-foreground">/</span>
+              <Input
+                type="number"
+                min="30"
+                max="150"
+                value={draftSecondary}
+                onChange={(e) => setDraftSecondary(e.target.value)}
+                placeholder="Diastolic (80)"
+                className="h-8 text-xs"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                step={item.id === "sleepHours" || item.id === "weightKg" ? "0.1" : "1"}
+                min="0"
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                placeholder="Enter value"
+                className="h-8 text-xs"
+                autoFocus
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {item.id === "sleepHours"
+                  ? "hours"
+                  : item.id === "waterGlasses"
+                    ? "glasses"
+                    : item.id === "weightKg"
+                      ? "kg"
+                      : item.id === "bloodGlucose"
+                        ? "mg/dL"
+                        : ""}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-border/40">
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="touch-press px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <X className="size-3" /> Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => saveEditField(item.id)}
+              className="touch-press px-2.5 py-1 rounded bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1 shadow-2xs"
+            >
+              <Check className="size-3" /> Save
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -261,11 +515,26 @@ export function CaptureReview({
           <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
           <div className="flex items-center gap-1">
             {item.hasValue && isIncluded && getConfidenceBadge(item.confidence)}
+            
+            {/* In-place edit button */}
+            {item.canExclude && (
+              <button
+                type="button"
+                onClick={() => startEditField(item.id)}
+                className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted/80 transition-colors ml-0.5"
+                title="Edit this value in place"
+                aria-label={`Edit ${item.label}`}
+              >
+                <Edit3 className="size-3.5" />
+              </button>
+            )}
+
+            {/* Include/Exclude Toggle */}
             {item.canExclude && item.hasValue && (
               <button
                 type="button"
                 onClick={() => toggleField(item.id)}
-                className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors ml-1"
+                className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors ml-0.5"
                 title={isIncluded ? t("review.excludeField") : t("review.includeField")}
                 aria-label={`${isIncluded ? "Exclude" : "Include"} ${item.label}`}
               >
@@ -512,23 +781,65 @@ export function CaptureReview({
         </div>
       )}
 
-      {/* Notes (if any) */}
-      {data.notes && (
+      {/* Notes (if any or when editing notes) */}
+      {(editedValues.notes || editingFieldId === "notes") && (
         <div className="space-y-1 rounded-xl bg-muted/40 p-3 text-xs">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground block">{t("checkin.notes")}:</span>
-            <button
-              type="button"
-              onClick={() => toggleField("notes")}
-              className="text-[11px] text-primary hover:underline"
-            >
-              {includedFields.notes
-                ? t("review.excludeField") || "Exclude"
-                : t("review.includeField") || "Include"}
-            </button>
+            <div className="flex items-center gap-1">
+              {editingFieldId !== "notes" && (
+                <button
+                  type="button"
+                  onClick={() => startEditField("notes")}
+                  className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted/80 transition-colors"
+                  title="Edit notes"
+                  aria-label="Edit notes"
+                >
+                  <Edit3 className="size-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => toggleField("notes")}
+                className="text-[11px] text-primary hover:underline ml-1"
+              >
+                {includedFields.notes
+                  ? t("review.excludeField") || "Exclude"
+                  : t("review.includeField") || "Include"}
+              </button>
+            </div>
           </div>
-          {includedFields.notes && (
-            <p className="text-muted-foreground leading-relaxed italic">{data.notes}</p>
+          {editingFieldId === "notes" ? (
+            <div className="space-y-2 pt-1">
+              <textarea
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                placeholder="Add or update notes..."
+                rows={3}
+                className="w-full rounded-lg border border-primary/40 bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+                autoFocus
+              />
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="touch-press px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  <X className="size-3" /> Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveEditField("notes")}
+                  className="touch-press px-2.5 py-1 rounded bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1 shadow-2xs"
+                >
+                  <Check className="size-3" /> Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            includedFields.notes && (
+              <p className="text-muted-foreground leading-relaxed italic">{editedValues.notes}</p>
+            )
           )}
         </div>
       )}
@@ -634,7 +945,10 @@ export function CaptureReview({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={onEdit}
+          onClick={() => {
+            const target = loggedItems[0]?.id || "sleepHours";
+            startEditField(target);
+          }}
           disabled={busy}
           className="touch-press text-xs h-10 gap-1.5 text-muted-foreground hover:text-foreground w-full sm:w-auto"
         >

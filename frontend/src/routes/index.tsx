@@ -24,6 +24,7 @@ import { LanguageSelector } from "@/features/i18n/LanguageSelector";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { useTranslation } from "@/locales/i18n";
 import { useAuthListener } from "@/features/auth/useAuth";
+import { AppLoadingScreen } from "@/components/common/AppLoadingScreen";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -58,6 +59,10 @@ export function Landing() {
       void navigate({ to: "/app/dashboard", replace: true });
     }
   }, [loading, user, navigate]);
+
+  if (loading || user) {
+    return <AppLoadingScreen />;
+  }
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);

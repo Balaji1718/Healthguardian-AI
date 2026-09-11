@@ -6,6 +6,7 @@ import { useAuthListener } from "@/features/auth/useAuth";
 import { isFirebaseConfigured } from "@/services/firebase/config";
 import { FirebaseSetupNotice } from "@/components/common/FirebaseSetupNotice";
 
+import { AppLoadingScreen } from "@/components/common/AppLoadingScreen";
 import { useTranslation } from "@/locales/i18n";
 
 export const Route = createFileRoute("/app")({
@@ -39,12 +40,7 @@ function AppLayout() {
   }, [loading, user, location.pathname, navigate]);
 
   if (!isFirebaseConfigured) return <FirebaseSetupNotice />;
-  if (loading || !user)
-    return (
-      <div className="p-10">
-        <LoadingState label={t("auth.checkingSession") || "Checking your session…"} />
-      </div>
-    );
+  if (loading || !user) return <AppLoadingScreen />;
 
   return (
     <AppShell>
