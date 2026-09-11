@@ -9,12 +9,17 @@ import {
   FileText,
   Check,
   X,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatSymptom } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
 import type { CheckinSource, DailyCheckin } from "@/models";
+import type { HealthInterpretationResult } from "@/services/ai/interpretation";
 
 export interface CaptureReviewProps {
   date: string;
@@ -26,6 +31,7 @@ export interface CaptureReviewProps {
   sourceDocument?: string;
   sourcePage?: number;
   inputUtterance?: string;
+  interpretation?: HealthInterpretationResult | null;
   analysis?: {
     enhancedSummary?: string | null;
     conditionInsights?: string[];
@@ -55,12 +61,14 @@ export function CaptureReview({
   sourceDocument,
   sourcePage,
   inputUtterance,
+  interpretation,
   analysis,
   onEdit,
   onConfirm,
   busy,
 }: CaptureReviewProps) {
   const { t } = useTranslation();
+  const [showAdditionalMetrics, setShowAdditionalMetrics] = useState(false);
   // Track which fields the user has explicitly selected/included for save
   const [includedFields, setIncludedFields] = useState<Record<string, boolean>>({
     date: true,
@@ -177,6 +185,9 @@ export function CaptureReview({
     [date, data, wellbeingObj, fieldConfidence, t],
   );
 
+  const loggedItems = useMemo(() => items.filter((i) => i.hasValue), [items]);
+  const unloggedItems = useMemo(() => items.filter((i) => !i.hasValue), [items]);
+
   // Compute final payload with only user-included fields
   const handleConfirmAction = async () => {
     const finalPayload: Partial<DailyCheckin> = {
@@ -231,6 +242,54 @@ export function CaptureReview({
     );
   };
 
+  const renderFieldItem = (item: (typeof items)[0]) => {
+    const isIncluded = includedFields[item.id] ?? true;
+    const isHighlighted = item.hasValue && isIncluded;
+
+    return (
+      <div
+        key={item.id}
+        className={`p-3 rounded-xl border text-xs transition-all relative group ${
+          isHighlighted
+            ? "bg-card border-border shadow-2xs"
+            : isIncluded
+              ? "bg-muted/30 border-border/40 text-muted-foreground"
+              : "bg-muted/10 border-border/20 opacity-50 line-through"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
+          <div className="flex items-center gap-1">
+            {item.hasValue && isIncluded && getConfidenceBadge(item.confidence)}
+            {item.canExclude && item.hasValue && (
+              <button
+                type="button"
+                onClick={() => toggleField(item.id)}
+                className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors ml-1"
+                title={isIncluded ? t("review.excludeField") : t("review.includeField")}
+                aria-label={`${isIncluded ? "Exclude" : "Include"} ${item.label}`}
+              >
+                {isIncluded ? (
+                  <Check className="size-4 text-primary" />
+                ) : (
+                  <X className="size-4" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <span
+          className={`font-semibold block ${
+            isHighlighted ? "text-foreground" : "text-muted-foreground/80 italic no-underline"
+          }`}
+        >
+          {item.value}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="surface p-5 sm:p-6 space-y-5 max-w-xl mx-auto rounded-2xl shadow-xs border">
       {/* Header */}
@@ -277,55 +336,96 @@ export function CaptureReview({
         </div>
       )}
 
-      {/* Structured Fields with Per-Field Inclusion Controls */}
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        {items.map((item) => {
-          const isIncluded = includedFields[item.id] ?? true;
-          const isHighlighted = item.hasValue && isIncluded;
-
-          return (
-            <div
-              key={item.id}
-              className={`p-3 rounded-xl border text-xs transition-all relative group ${
-                isHighlighted
-                  ? "bg-card border-border shadow-2xs"
-                  : isIncluded
-                    ? "bg-muted/30 border-border/40 text-muted-foreground"
-                    : "bg-muted/10 border-border/20 opacity-50 line-through"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
-                <div className="flex items-center gap-1">
-                  {item.hasValue && isIncluded && getConfidenceBadge(item.confidence)}
-                  {item.canExclude && item.hasValue && (
-                    <button
-                      type="button"
-                      onClick={() => toggleField(item.id)}
-                      className="touch-press size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors ml-1"
-                      title={isIncluded ? t("review.excludeField") : t("review.includeField")}
-                      aria-label={`${isIncluded ? "Exclude" : "Include"} ${item.label}`}
-                    >
-                      {isIncluded ? (
-                        <Check className="size-4 text-primary" />
-                      ) : (
-                        <X className="size-4" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <span
-                className={`font-semibold block ${
-                  isHighlighted ? "text-foreground" : "text-muted-foreground/80 italic no-underline"
-                }`}
-              >
-                {item.value}
-              </span>
+      {/* 1. Understood Health Priorities (Major Points) */}
+      {interpretation?.majorPoints && interpretation.majorPoints.length > 0 && (
+        <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 text-xs space-y-2.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold text-primary text-xs">
+              <Sparkles className="size-4 text-primary" />
+              <span>Understood Health Priorities</span>
             </div>
-          );
-        })}
+            <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/10">
+              Major Points
+            </Badge>
+          </div>
+
+          <div className="space-y-1.5 pt-0.5">
+            {interpretation.majorPoints.map((point, idx) => (
+              <div key={idx} className="flex items-start gap-2 text-foreground font-medium text-xs leading-relaxed">
+                <span className="text-primary mt-0.5 font-bold">•</span>
+                <span>{point}</span>
+              </div>
+            ))}
+          </div>
+
+          {interpretation.secondaryDetails && interpretation.secondaryDetails.length > 0 && (
+            <div className="pt-2 border-t border-primary/15 text-muted-foreground text-[11px] space-y-0.5">
+              <span className="font-semibold text-foreground/80 block">Secondary Context:</span>
+              {interpretation.secondaryDetails.map((sec, idx) => (
+                <p key={idx} className="italic pl-2">{sec}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. Contextual Missing Info & Continuity Prompts */}
+      {interpretation?.missingInformation && interpretation.missingInformation.length > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-[11px]">
+            <HelpCircle className="size-3.5" />
+            <span>Suggested Continuity Context</span>
+          </div>
+          {interpretation.missingInformation.map((missing, idx) => (
+            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-muted-foreground pt-1">
+              <p className="leading-relaxed">{missing.prompt}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 3. Explicit Stated Health Metrics (Adaptive Display) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
+            Explicit Stated Metrics
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {loggedItems.length} active
+          </span>
+        </div>
+
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {loggedItems.map((item) => renderFieldItem(item))}
+        </div>
+
+        {/* Expandable Additional Metrics (Avoids rigid wall of "Not logged" boxes) */}
+        {unloggedItems.length > 0 && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAdditionalMetrics((prev) => !prev)}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors py-1"
+            >
+              {showAdditionalMetrics ? (
+                <ChevronUp className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+              <span>
+                {showAdditionalMetrics
+                  ? "Hide unlogged metrics"
+                  : `+ Add other metrics (${unloggedItems.length} available)`}
+              </span>
+            </button>
+
+            {showAdditionalMetrics && (
+              <div className="grid gap-2.5 sm:grid-cols-2 pt-2 animate-in fade-in duration-150">
+                {unloggedItems.map((item) => renderFieldItem(item))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Context Chips (if any) */}
@@ -433,20 +533,42 @@ export function CaptureReview({
         </div>
       )}
 
-      {/* AI Health Analysis, Risk Patterns & Body Condition Insights */}
-      {analysis && (
-        <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs animate-in fade-in">
-          <div className="flex items-center gap-1.5 text-primary font-semibold">
-            <Sparkles className="size-4" />
-            <span>AI Health Analysis & Risk Insights</span>
+      {/* 4. Contextual Health Analysis & Inferences (Separated Provenance) */}
+      {((interpretation?.inferredContext && interpretation.inferredContext.length > 0) || (analysis?.conditionInsights && analysis.conditionInsights.length > 0)) && (
+        <div className="space-y-2.5 rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-primary/10 pb-2">
+            <div className="flex items-center gap-1.5 text-primary font-semibold">
+              <Sparkles className="size-4" />
+              <span>AI Health Analysis & Contextual Inferences</span>
+            </div>
+            <Badge variant="outline" className="text-[9px] text-muted-foreground border-muted-foreground/30">
+              Unconfirmed Inferences
+            </Badge>
           </div>
 
-          {analysis.conditionInsights && analysis.conditionInsights.length > 0 && (
+          {/* Inferred Contexts */}
+          {interpretation?.inferredContext && interpretation.inferredContext.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                Contextual Observations
+              </span>
+              <div className="space-y-1">
+                {interpretation.inferredContext.map((inf, idx) => (
+                  <div key={idx} className="p-2 rounded-lg bg-card/60 border border-border/40 text-[11px] space-y-0.5">
+                    <span className="font-medium text-foreground block">{inf.topic}</span>
+                    <p className="text-muted-foreground leading-relaxed">{inf.inference}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysis?.conditionInsights && analysis.conditionInsights.length > 0 && (
             <div className="space-y-1">
-              <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider block">
+              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider block">
                 Condition & Recovery
               </span>
-              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.conditionInsights.map((insight, idx) => (
                   <li key={idx} className="leading-relaxed">{insight}</li>
                 ))}
@@ -454,12 +576,12 @@ export function CaptureReview({
             </div>
           )}
 
-          {analysis.riskPatterns && analysis.riskPatterns.length > 0 && (
-            <div className="space-y-1 pt-1">
-              <span className="text-[11px] font-semibold text-amber-500 uppercase tracking-wider block">
+          {analysis?.riskPatterns && analysis.riskPatterns.length > 0 && (
+            <div className="space-y-1 pt-1 border-t border-primary/10">
+              <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wider block">
                 Risk Pattern Observations
               </span>
-              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.riskPatterns.map((pattern, idx) => (
                   <li key={idx} className="leading-relaxed">{pattern}</li>
                 ))}
@@ -467,12 +589,12 @@ export function CaptureReview({
             </div>
           )}
 
-          {analysis.historySuggestions && analysis.historySuggestions.length > 0 && (
-            <div className="space-y-1 pt-1">
-              <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider block">
-                Health History Suggestions
+          {analysis?.historySuggestions && analysis.historySuggestions.length > 0 && (
+            <div className="space-y-1 pt-1 border-t border-primary/10">
+              <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider block">
+                Health Continuity Suggestions
               </span>
-              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.historySuggestions.map((sug, idx) => (
                   <li key={idx} className="leading-relaxed">{sug}</li>
                 ))}

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { HealthInterpretationResult } from "./interpretation";
+
 const healthObservationSchema = z.object({
   category: z.string().min(1).max(40),
   label: z.string().min(1).max(120),
@@ -54,6 +56,7 @@ export type ExtractedCheckinData = z.infer<typeof extractedCheckinSchema>;
 export interface ExtractionResponse {
   ok: boolean;
   data?: ExtractedCheckinData | undefined;
+  interpretation?: HealthInterpretationResult | undefined;
   error?: string | undefined;
   emergency?: boolean | undefined;
   emergencyMessage?: string | undefined;
@@ -102,6 +105,7 @@ export async function extractCheckinFromText(
         return {
           ok: true,
           data: validated.data,
+          interpretation: payload.interpretation,
           provider: payload.provider,
         };
       }

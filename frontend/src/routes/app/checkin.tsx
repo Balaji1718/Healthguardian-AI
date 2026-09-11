@@ -20,6 +20,7 @@ import {
   extractCheckinFromText,
   type CheckinExtractionResult,
 } from "@/services/ai/conversational-checkin";
+import type { HealthInterpretationResult } from "@/services/ai/interpretation";
 import { UnifiedCheckinComposer } from "@/features/checkin/UnifiedCheckinComposer";
 import { ConnectedFolderPanel } from "@/features/checkin/ConnectedFolderPanel";
 import { runOcr } from "@/services/ocr/ocr";
@@ -91,6 +92,7 @@ function Checkin() {
   const [ambiguityReasonsList, setAmbiguityReasonsList] = useState<string[]>([]);
   const [rawInputUtterance, setRawInputUtterance] = useState<string>("");
   const [analysisResult, setAnalysisResult] = useState<CheckinExtractionResult["analysis"] | undefined>();
+  const [interpretationResult, setInterpretationResult] = useState<HealthInterpretationResult | undefined>();
 
   // Pre-fill when an entry already exists for the chosen date
   useEffect(() => {
@@ -176,6 +178,7 @@ function Checkin() {
     setAmbiguityWarning(null);
     setAmbiguityReasonsList([]);
     setAnalysisResult(undefined);
+    setInterpretationResult(undefined);
     setSourceDoc(docFilename ? { name: docFilename, page: docPage } : undefined);
 
     try {
@@ -193,6 +196,10 @@ function Checkin() {
             "I couldn't understand that check-in clearly. Please try speaking or typing with more details.",
         );
         return;
+      }
+
+      if (res.interpretation) {
+        setInterpretationResult(res.interpretation);
       }
 
       const extracted = res.data;
@@ -454,6 +461,7 @@ function Checkin() {
           sourcePage={sourceDoc?.page}
           inputUtterance={rawInputUtterance}
           analysis={analysisResult}
+          interpretation={interpretationResult}
           onEdit={() => setMode("composer")}
           onConfirm={handleConfirmSave}
           busy={busy}

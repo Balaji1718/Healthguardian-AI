@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { routeCompletion } from "./ai-provider-router.js";
+import { interpretUserInput } from "./interpretation-orchestrator.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -561,75 +562,8 @@ RULES:
 }
 
 /**
- * Executes bounded conversational extraction using the AI provider router with safe rule-based fallback.
+ * Executes bounded conversational extraction using the AI interpretation and orchestration engine.
  */
 export async function extractConversationalCheckin(userText, language = "en") {
-  const text = (userText || "").trim();
-  if (!text) {
-    return { ok: false, error: "Please enter your check-in description." };
-  }
-
-  // 1. Safety Gate Check
-  const emergency = checkEmergencySymptoms(text);
-  if (emergency) {
-    return {
-      ok: false,
-      emergency: true,
-      emergencyMessage: emergency,
-    };
-  }
-
-  // 2. Try LLM Extraction via Router
-  try {
-    const messages = [
-      { role: "system", content: `${SYSTEM_EXTRACTION_PROMPT}\nTarget application language: ${language}` },
-      { role: "user", content: text },
-    ];
-
-    const aiRes = await routeCompletion({
-      messages,
-      temperature: 0.1,
-      maxTokens: 500,
-      json: true,
-    });
-
-    if (aiRes?.ok && typeof aiRes.text === "string") {
-      let rawJson;
-      try {
-        rawJson = JSON.parse(aiRes.text);
-      } catch {
-        const cleaned = aiRes.text.replace(/```(?:json)?/g, "").trim();
-        rawJson = JSON.parse(cleaned);
-      }
-
-      const validated = extractionSchema.safeParse(rawJson);
-      if (validated.success) {
-        return {
-          ok: true,
-          data: validated.data,
-          provider: aiRes.provider,
-          source: "conversational",
-        };
-      }
-    }
-  } catch (err) {
-    // Fall through to deterministic rule-based extractor
-  }
-
-  // 3. Fallback to Rule-Based Extractor
-  const ruleData = extractWithRules(text, language);
-  const validatedRule = extractionSchema.safeParse(ruleData);
-  if (validatedRule.success) {
-    return {
-      ok: true,
-      data: validatedRule.data,
-      provider: "rule_fallback",
-      source: "conversational",
-    };
-  }
-
-  return {
-    ok: false,
-    error: "I couldn't understand that check-in clearly. You can edit the text or use Quick Check-in.",
-  };
+  return await interpretUserInput(userText, language);
 }

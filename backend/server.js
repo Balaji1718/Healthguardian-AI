@@ -13,6 +13,7 @@ import { createServer as createViteServer } from 'vite';
 import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeCompletion, testProvider } from './ai-provider-router.js';
 import { executeWebSearch } from './web-search.js';
 import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
+import { interpretUserInput } from './interpretation-orchestrator.js';
 import { sendUserPush } from './firebase-admin.js';
 
 const frontendRoot = path.resolve(__dirname, '../frontend');
@@ -85,12 +86,26 @@ app.post('/api/ai/search', async (req, res) => {
   }
 });
 
+app.post('/api/ai/interpret', async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text : '';
+  const language = typeof req.body?.language === 'string' ? req.body.language : 'en';
+  const userContext = req.body?.userContext || {};
+  if (!text.trim()) return res.status(400).json({ ok: false, error: 'Text is required.' });
+  try {
+    const result = await interpretUserInput(text, language, userContext);
+    return res.status(200).json(result);
+  } catch {
+    return res.status(500).json({ ok: false, error: 'Interpretation failed.' });
+  }
+});
+
 app.post('/api/ai/extract-checkin', async (req, res) => {
   const text = typeof req.body?.text === 'string' ? req.body.text : '';
   const language = typeof req.body?.language === 'string' ? req.body.language : 'en';
+  const userContext = req.body?.userContext || {};
   if (!text.trim()) return res.status(400).json({ ok: false, error: 'Text is required.' });
   try {
-    const result = await extractConversationalCheckin(text, language);
+    const result = await interpretUserInput(text, language, userContext);
     return res.status(200).json(result);
   } catch {
     return res.status(500).json({ ok: false, error: 'Conversational extraction failed.' });
