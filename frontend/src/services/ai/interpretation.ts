@@ -20,7 +20,8 @@ export interface MissingInfoItem {
 }
 
 export interface HealthInterpretationResult {
-  mainIntent: "daily_checkin" | "symptom_concern" | "health_query" | "habit_goal" | "general_update";
+  mainIntent:
+    "daily_checkin" | "symptom_concern" | "health_query" | "habit_goal" | "general_update";
   summary: string;
   majorPoints: string[];
   secondaryDetails: string[];

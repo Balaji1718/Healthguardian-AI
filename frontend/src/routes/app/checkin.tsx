@@ -1,12 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  FileText,
-  Mic,
-  Sparkles,
-} from "lucide-react";
+import { AlertTriangle, FileText, Mic, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, OfflineNotice } from "@/components/common/States";
@@ -27,7 +22,6 @@ import { runOcr } from "@/services/ocr/ocr";
 import { validateFile } from "@/services/localStorage/documents";
 import { useTranslation } from "@/locales/i18n";
 import type { CheckinSource, DailyCheckin } from "@/models";
-
 
 export const Route = createFileRoute("/app/checkin")({
   component: Checkin,
@@ -91,8 +85,12 @@ function Checkin() {
   >({});
   const [ambiguityReasonsList, setAmbiguityReasonsList] = useState<string[]>([]);
   const [rawInputUtterance, setRawInputUtterance] = useState<string>("");
-  const [analysisResult, setAnalysisResult] = useState<CheckinExtractionResult["analysis"] | undefined>();
-  const [interpretationResult, setInterpretationResult] = useState<HealthInterpretationResult | undefined>();
+  const [analysisResult, setAnalysisResult] = useState<
+    CheckinExtractionResult["analysis"] | undefined
+  >();
+  const [interpretationResult, setInterpretationResult] = useState<
+    HealthInterpretationResult | undefined
+  >();
 
   // Pre-fill when an entry already exists for the chosen date
   useEffect(() => {
@@ -179,7 +177,13 @@ function Checkin() {
     setAmbiguityReasonsList([]);
     setAnalysisResult(undefined);
     setInterpretationResult(undefined);
-    setSourceDoc(docFilename ? { name: docFilename, page: docPage } : undefined);
+    setSourceDoc(
+      docFilename
+        ? docPage != null
+          ? { name: docFilename, page: docPage }
+          : { name: docFilename }
+        : undefined,
+    );
 
     try {
       const res = await extractCheckinFromText(cleanText, lang);
@@ -221,7 +225,16 @@ function Checkin() {
         bloodGlucoseUnit: extracted.bloodGlucoseUnit ?? "mg/dL",
         notes: extracted.notes ?? cleanText,
       });
-        setObservations(extracted.observations ?? []);
+      setObservations(
+        (extracted.observations ?? []).map((o) => ({
+          ...o,
+          valueText: o.valueText || undefined,
+          severity: o.severity || undefined,
+          unit: o.unit || undefined,
+          numericValue: o.numericValue ?? undefined,
+          temporalContext: o.temporalContext || undefined,
+        })),
+      );
 
       if (extracted.tags && Array.isArray(extracted.tags)) {
         setSelectedTags(extracted.tags);
@@ -280,7 +293,7 @@ function Checkin() {
 
       if (!text) {
         toast.warning("No readable text found in this file. Please enter values manually.");
-        setMode("detailed");
+        setMode("composer");
         return;
       }
 
@@ -348,16 +361,8 @@ function Checkin() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
         <PageHeader
-          title={
-            mode === "review"
-              ? t("checkin.reviewTitle")
-              : t("checkin.title")
-          }
-          description={
-            mode === "review"
-              ? t("checkin.reviewSubtitle")
-              : t("checkin.subtitle")
-          }
+          title={mode === "review" ? t("checkin.reviewTitle") : t("checkin.title")}
+          description={mode === "review" ? t("checkin.reviewSubtitle") : t("checkin.subtitle")}
         />
 
         {mode !== "composer" && (

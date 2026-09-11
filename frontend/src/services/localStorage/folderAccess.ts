@@ -112,7 +112,7 @@ export async function verifyFolderPermission(
   requestIfNeeded = false,
 ): Promise<boolean> {
   try {
-    const opts: FileSystemHandlePermissionDescriptor = { mode: "read" };
+    const opts = { mode: "read" as const };
     // @ts-expect-error queryPermission exists on FileSystemHandle in modern browsers
     if ((await handle.queryPermission(opts)) === "granted") {
       return true;
@@ -357,8 +357,8 @@ export function extractDocumentCheckinData(
     detectedDate: null,
     multiDatesDetected: [],
     extractedCount: 0,
-    sourceFilename: filename,
-    sourcePage: page,
+    ...(filename ? { sourceFilename: filename } : {}),
+    ...(page != null ? { sourcePage: page } : {}),
   };
 
   // 1. Date Extraction (ISO, DD Month YYYY, DD/MM/YYYY)
@@ -397,7 +397,7 @@ export function extractDocumentCheckinData(
 
   if (sleepMatch && sleepMatch[1]) {
     res.data.sleepHours = Number(sleepMatch[1]);
-    res.fieldConfidence.sleepHours = "high";
+    res.fieldConfidence["sleepHours"] = "high";
     res.extractedCount++;
   } else if (
     /(?:sleep|slept)\s*[:|=|\t]?\s*(?:between\s+\d+\s+and\s+\d+|\d+\s*-\s*\d+\s*hours)/i.test(norm)
@@ -416,7 +416,7 @@ export function extractDocumentCheckinData(
 
   if (waterMatch && waterMatch[1]) {
     res.data.waterGlasses = Number(waterMatch[1]);
-    res.fieldConfidence.waterGlasses = "high";
+    res.fieldConfidence["waterGlasses"] = "high";
     res.extractedCount++;
   }
 
@@ -430,7 +430,7 @@ export function extractDocumentCheckinData(
 
   if (exerciseMatch && exerciseMatch[1]) {
     res.data.exerciseMinutes = Number(exerciseMatch[1]);
-    res.fieldConfidence.exerciseMinutes = "high";
+    res.fieldConfidence["exerciseMinutes"] = "high";
     res.extractedCount++;
   }
 
@@ -459,7 +459,7 @@ export function extractDocumentCheckinData(
 
     if (weightMatch && weightMatch[1]) {
       res.data.weightKg = Number(weightMatch[1]);
-      res.fieldConfidence.weightKg = "high";
+      res.fieldConfidence["weightKg"] = "high";
       res.extractedCount++;
     }
   }
@@ -473,8 +473,8 @@ export function extractDocumentCheckinData(
   if (bpSlashMatch && bpSlashMatch[1] && bpSlashMatch[2]) {
     res.data.systolicBP = Number(bpSlashMatch[1]);
     res.data.diastolicBP = Number(bpSlashMatch[2]);
-    res.fieldConfidence.systolicBP = "high";
-    res.fieldConfidence.diastolicBP = "high";
+    res.fieldConfidence["systolicBP"] = "high";
+    res.fieldConfidence["diastolicBP"] = "high";
     res.extractedCount += 2;
   } else {
     const sysMatch = norm.match(/(?:systolic|sys)(?:\s*bp)?\s*[:|=|\t|]+\s*(\d{2,3})/i);
@@ -482,8 +482,8 @@ export function extractDocumentCheckinData(
     if (sysMatch && sysMatch[1] && diaMatch && diaMatch[1]) {
       res.data.systolicBP = Number(sysMatch[1]);
       res.data.diastolicBP = Number(diaMatch[1]);
-      res.fieldConfidence.systolicBP = "high";
-      res.fieldConfidence.diastolicBP = "high";
+      res.fieldConfidence["systolicBP"] = "high";
+      res.fieldConfidence["diastolicBP"] = "high";
       res.extractedCount += 2;
     }
   }
@@ -502,7 +502,7 @@ export function extractDocumentCheckinData(
   if (glucoseMatch && glucoseMatch[1]) {
     res.data.bloodGlucose = Number(glucoseMatch[1]);
     res.data.bloodGlucoseUnit = glucoseMatch[2]?.toLowerCase() === "mmol/l" ? "mmol/L" : "mg/dL";
-    res.fieldConfidence.bloodGlucose = "high";
+    res.fieldConfidence["bloodGlucose"] = "high";
     res.extractedCount++;
   } else if (ocrTypoMatch && ocrTypoMatch[1] && /[oO]/.test(ocrTypoMatch[1])) {
     // Flag possible OCR letter-digit substitution (e.g. 1O4 -> 104)
@@ -510,7 +510,7 @@ export function extractDocumentCheckinData(
     if (!Number.isNaN(corrected) && corrected > 30 && corrected < 600) {
       res.data.bloodGlucose = corrected;
       res.data.bloodGlucoseUnit = "mg/dL";
-      res.fieldConfidence.bloodGlucose = "medium";
+      res.fieldConfidence["bloodGlucose"] = "medium";
       res.isAmbiguous = true;
       res.ambiguityReasons.push(
         `Glucose reading '${ocrTypoMatch[1]}' contains possible OCR character defect. Please verify this value.`,
@@ -522,19 +522,19 @@ export function extractDocumentCheckinData(
   // 8. Wellbeing & Mood extraction
   if (/\b(feeling great|felt great|super good|amazing)\b/i.test(lower)) {
     res.data.wellbeing = "great";
-    res.fieldConfidence.wellbeing = "high";
+    res.fieldConfidence["wellbeing"] = "high";
   } else if (/\b(feeling good|felt good|pretty good)\b/i.test(lower)) {
     res.data.wellbeing = "good";
-    res.fieldConfidence.wellbeing = "high";
+    res.fieldConfidence["wellbeing"] = "high";
   } else if (/\b(feeling okay|felt okay|was okay|fine)\b/i.test(lower)) {
     res.data.wellbeing = "okay";
-    res.fieldConfidence.wellbeing = "high";
+    res.fieldConfidence["wellbeing"] = "high";
   } else if (/\b(tired|exhausted|fatigued|sleepy)\b/i.test(lower)) {
     res.data.wellbeing = "tired";
-    res.fieldConfidence.wellbeing = "high";
+    res.fieldConfidence["wellbeing"] = "high";
   } else if (/\b(not great|felt bad|unwell|sick)\b/i.test(lower)) {
     res.data.wellbeing = "not_great";
-    res.fieldConfidence.wellbeing = "high";
+    res.fieldConfidence["wellbeing"] = "high";
   }
 
   // 9. Symptoms extraction
@@ -560,7 +560,7 @@ export function extractDocumentCheckinData(
   }
   if (detectedSymptoms.length > 0) {
     res.data.symptoms = detectedSymptoms;
-    res.fieldConfidence.symptoms = "high";
+    res.fieldConfidence["symptoms"] = "high";
   }
 
   return res;

@@ -208,7 +208,7 @@ function Assistant() {
     }
   };
 
-  const handleSelectStarter = (starter: (typeof STARTER_PROMPTS)[0]) => {
+  const handleSelectStarter = (starter: ReturnType<typeof getStarterPrompts>[number]) => {
     if (starter.enableWebSearch) {
       setWebSearchEnabled(true);
     }
@@ -400,17 +400,19 @@ function Assistant() {
       {messages.length > 0 && !busy && (
         <div className="mx-auto w-full max-w-3xl px-2 sm:px-4">
           <div className="flex items-center gap-1.5 overflow-x-auto snap-x no-scrollbar py-1">
-            {getStarterPrompts(t).slice(0, 4).map((item, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSelectStarter(item)}
-                className="touch-press inline-flex shrink-0 snap-start items-center gap-1 rounded-full border bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
+            {getStarterPrompts(t)
+              .slice(0, 4)
+              .map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSelectStarter(item)}
+                  className="touch-press inline-flex shrink-0 snap-start items-center gap-1 rounded-full border bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
           </div>
         </div>
       )}

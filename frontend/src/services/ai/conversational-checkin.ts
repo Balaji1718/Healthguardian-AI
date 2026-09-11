@@ -52,6 +52,7 @@ export const extractedCheckinSchema = z
   .strict();
 
 export type ExtractedCheckinData = z.infer<typeof extractedCheckinSchema>;
+export type CheckinExtractionResult = ExtractedCheckinData;
 
 export interface ExtractionResponse {
   ok: boolean;

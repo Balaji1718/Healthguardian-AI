@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 
@@ -9,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let adminApp;
 
-function getAdminApp() {
+export function getAdminApp() {
   if (adminApp) return adminApp;
 
   let projectId = process.env.FIREBASE_PROJECT_ID;
@@ -36,6 +37,17 @@ function getAdminApp() {
     credential: cert({ projectId, clientEmail, privateKey }),
   });
   return adminApp;
+}
+
+export async function verifyIdToken(idToken) {
+  const app = getAdminApp();
+  if (!app || !idToken) return null;
+  try {
+    const decoded = await getAuth(app).verifyIdToken(idToken);
+    return decoded;
+  } catch (err) {
+    return null;
+  }
 }
 
 export async function sendUserPush(uid, title, body, data = {}) {

@@ -150,18 +150,27 @@ export function Landing() {
             <span className="font-semibold text-foreground flex items-center gap-1.5">
               <FileText className="size-3.5 text-primary" /> {t("landing.mockPillar2Header")}
             </span>
-            <Badge variant="outline" className="text-[10px] bg-background text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+            <Badge
+              variant="outline"
+              className="text-[10px] bg-background text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+            >
               {t("landing.mockPillar2Badge")}
             </Badge>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 border">
-              <span className="text-muted-foreground font-medium">{t("landing.mockPillar2Item1")}</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{t("landing.mockPillar2Val1")}</span>
+              <span className="text-muted-foreground font-medium">
+                {t("landing.mockPillar2Item1")}
+              </span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                {t("landing.mockPillar2Val1")}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 border border-amber-500/20">
               <span className="text-foreground font-medium">{t("landing.mockPillar2Item2")}</span>
-              <span className="font-semibold text-amber-600 dark:text-amber-400">{t("landing.mockPillar2Val2")}</span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {t("landing.mockPillar2Val2")}
+              </span>
             </div>
           </div>
         </div>
@@ -175,7 +184,9 @@ export function Landing() {
       mockUi: (
         <div className="mt-5 rounded-xl border bg-background/50 p-4 space-y-3 text-xs">
           <div className="flex items-center justify-between border-b pb-2">
-            <span className="text-muted-foreground font-medium">{t("landing.mockPillar3Label")}</span>
+            <span className="text-muted-foreground font-medium">
+              {t("landing.mockPillar3Label")}
+            </span>
             <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 font-semibold">
               {t("landing.mockPillar3Score")}
             </Badge>
@@ -257,13 +268,13 @@ export function Landing() {
         <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
           {t("landing.heroTitle")}
         </h1>
-        <p className="mt-5 max-w-2xl text-base opacity-95 leading-relaxed">{t("landing.heroDescription")}</p>
+        <p className="mt-5 max-w-2xl text-base opacity-95 leading-relaxed">
+          {t("landing.heroDescription")}
+        </p>
         <div className="mt-8 flex flex-wrap gap-3">
           {user ? (
             <Button asChild size="lg" variant="secondary">
-              <Link to="/app/dashboard">
-                {t("nav.dashboard") || "Dashboard"}
-              </Link>
+              <Link to="/app/dashboard">{t("nav.dashboard") || "Dashboard"}</Link>
             </Button>
           ) : (
             <>
@@ -304,9 +315,7 @@ export function Landing() {
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {t("landing.howItWorksTitle")}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("landing.howItWorksSubtitle")}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("landing.howItWorksSubtitle")}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -323,12 +332,8 @@ export function Landing() {
                       <Icon className="size-5" />
                     </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {step.desc}
-                  </p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
                 </div>
                 <div className="mt-6 pt-4 border-t">
                   <Badge variant="secondary" className="text-xs font-medium">
@@ -347,9 +352,7 @@ export function Landing() {
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {t("landing.pillarTitle")}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("landing.pillarSubtitle")}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("landing.pillarSubtitle")}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -366,9 +369,7 @@ export function Landing() {
                       {pillar.badge}
                     </Badge>
                   </div>
-                  <h3 className="text-xl font-semibold text-foreground">
-                    {pillar.title}
-                  </h3>
+                  <h3 className="text-xl font-semibold text-foreground">{pillar.title}</h3>
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     {pillar.desc}
                   </p>
@@ -398,18 +399,30 @@ export function Landing() {
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border bg-background/50 p-5 space-y-2">
               <Lock className="size-5 text-primary mb-2" />
-              <h4 className="text-sm font-semibold text-foreground">{t("landing.privacy1Title")}</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">{t("landing.privacy1Desc")}</p>
+              <h4 className="text-sm font-semibold text-foreground">
+                {t("landing.privacy1Title")}
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t("landing.privacy1Desc")}
+              </p>
             </div>
             <div className="rounded-xl border bg-background/50 p-5 space-y-2">
               <CheckCircle2 className="size-5 text-emerald-500 mb-2" />
-              <h4 className="text-sm font-semibold text-foreground">{t("landing.privacy2Title")}</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">{t("landing.privacy2Desc")}</p>
+              <h4 className="text-sm font-semibold text-foreground">
+                {t("landing.privacy2Title")}
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t("landing.privacy2Desc")}
+              </p>
             </div>
             <div className="rounded-xl border bg-background/50 p-5 space-y-2">
               <ShieldCheck className="size-5 text-primary mb-2" />
-              <h4 className="text-sm font-semibold text-foreground">{t("landing.privacy3Title")}</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">{t("landing.privacy3Desc")}</p>
+              <h4 className="text-sm font-semibold text-foreground">
+                {t("landing.privacy3Title")}
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t("landing.privacy3Desc")}
+              </p>
             </div>
           </div>
         </div>
@@ -421,9 +434,7 @@ export function Landing() {
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {t("landing.faqTitle")}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("landing.faqSubtitle")}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("landing.faqSubtitle")}</p>
         </div>
 
         <div className="space-y-3">

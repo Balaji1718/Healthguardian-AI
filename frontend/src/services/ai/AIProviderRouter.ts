@@ -29,10 +29,11 @@ export class AIProviderRouter {
         };
       }
 
+      const errStr = typeof result.error === "string" ? result.error.toLowerCase() : "";
       const retryable =
-        typeof result.error === "string" &&
+        Boolean(errStr) &&
         ["timeout", "network", "rate limit", "server", "malformed", "HTTP 429", "HTTP 5"].some(
-          (fragment) => result.error.toLowerCase().includes(fragment),
+          (fragment) => errStr.includes(fragment.toLowerCase()),
         );
 
       if (!retryable) {

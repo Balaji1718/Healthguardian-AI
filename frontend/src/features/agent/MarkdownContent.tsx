@@ -72,6 +72,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
 
           if (tableRows.length > 0) {
             const [headers, ...rows] = tableRows;
+            if (!headers) return null;
             return (
               <div key={index} className="my-2 overflow-x-auto rounded border bg-card text-xs">
                 <table className="w-full text-left border-collapse">

@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import { resetProviderStates, routeCompletion } from "./ai-provider-router.js";
 
+// Ensure mock environment is clean and isolated
+delete process.env.OPENAI_API_KEY;
+delete process.env.GEMINI_API_KEY;
+
 // Ensure mock keys are present for mock router testing
-process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "mock-openrouter-key";
-process.env.GROQ_API_KEY = process.env.GROQ_API_KEY || "mock-groq-key";
-process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "mock-nvidia-key";
-process.env.MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || "mock-mistral-key";
-process.env.SAMBANOVA_API_KEY = process.env.SAMBANOVA_API_KEY || "mock-sambanova-key";
-process.env.COHERE_API_KEY = process.env.COHERE_API_KEY || "mock-cohere-key";
-process.env.CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY || "mock-cerebras-key";
+process.env.OPENROUTER_API_KEY = "mock-openrouter-key";
+process.env.GROQ_API_KEY = "mock-groq-key";
+process.env.NVIDIA_API_KEY = "mock-nvidia-key";
+process.env.MISTRAL_API_KEY = "mock-mistral-key";
+process.env.SAMBANOVA_API_KEY = "mock-sambanova-key";
+process.env.COHERE_API_KEY = "mock-cohere-key";
+process.env.CEREBRAS_API_KEY = "mock-cerebras-key";
 
 const request = { messages: [{ role: "user", content: "synthetic fallback test" }] };
 const providers = {

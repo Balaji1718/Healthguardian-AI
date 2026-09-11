@@ -121,7 +121,9 @@ export function GoalsPage() {
               setRemoveCompleted(true);
               try {
                 window.localStorage.setItem("hg_remove_completed_goals", "true");
-              } catch {}
+              } catch {
+                // ignore
+              }
               toast.success("Completed goals will be automatically removed from now on.");
             },
           },

@@ -261,7 +261,9 @@ export function ReportsPage() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">{t("reports.uploadBoxTitle") || "Upload Report"}</Label>
+            <Label className="text-sm font-medium">
+              {t("reports.uploadBoxTitle") || "Upload Report"}
+            </Label>
             <ContextualHelp content={t("reports.contextHelp")} />
           </div>
 
@@ -298,8 +300,12 @@ export function ReportsPage() {
                   <Camera className="size-5" />
                 </div>
                 <div className="text-left min-w-0">
-                  <p className="text-sm font-semibold truncate">{t("reports.takePhoto") || "Take Photo of Report"}</p>
-                  <p className="text-xs text-muted-foreground truncate">Direct mobile camera scan</p>
+                  <p className="text-sm font-semibold truncate">
+                    {t("reports.takePhoto") || "Take Photo of Report"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Direct mobile camera scan
+                  </p>
                 </div>
               </button>
 
@@ -312,8 +318,12 @@ export function ReportsPage() {
                   <Upload className="size-5" />
                 </div>
                 <div className="text-left min-w-0">
-                  <p className="text-sm font-semibold truncate">{t("reports.chooseFile") || "Upload PDF or File"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{t("reports.uploadBoxHint")}</p>
+                  <p className="text-sm font-semibold truncate">
+                    {t("reports.chooseFile") || "Upload PDF or File"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {t("reports.uploadBoxHint")}
+                  </p>
                 </div>
               </button>
             </div>
@@ -321,12 +331,17 @@ export function ReportsPage() {
             <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  {file.type.startsWith("image/") ? <Camera className="size-5" /> : <FileText className="size-5" />}
+                  {file.type.startsWith("image/") ? (
+                    <Camera className="size-5" />
+                  ) : (
+                    <FileText className="size-5" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB · {file.type.split("/")[1]?.toUpperCase() || "FILE"}
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB ·{" "}
+                    {file.type.split("/")[1]?.toUpperCase() || "FILE"}
                   </p>
                 </div>
               </div>
@@ -346,13 +361,18 @@ export function ReportsPage() {
         {progress !== null && (
           <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
             <p className="flex items-center gap-2 text-xs sm:text-sm font-medium text-primary">
-              <ScanLine className="size-4 animate-pulse" /> {t("reports.readingProgress", { progress })}
+              <ScanLine className="size-4 animate-pulse" />{" "}
+              {t("reports.readingProgress", { progress })}
             </p>
             <Progress value={progress} className="h-2" />
           </div>
         )}
 
-        <Button type="submit" disabled={busy || !file} className="w-full sm:w-auto min-h-[48px] touch-press text-base sm:text-sm">
+        <Button
+          type="submit"
+          disabled={busy || !file}
+          className="w-full sm:w-auto min-h-[48px] touch-press text-base sm:text-sm"
+        >
           {busy ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
           ) : (
@@ -366,10 +386,16 @@ export function ReportsPage() {
         <section className="surface mt-6 p-4 sm:p-6">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="font-semibold text-base sm:text-lg">{t("reports.verifyModalTitle")}</h2>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{t("reports.verifyModalDesc")}</p>
+              <h2 className="font-semibold text-base sm:text-lg">
+                {t("reports.verifyModalTitle")}
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                {t("reports.verifyModalDesc")}
+              </p>
             </div>
-            <Badge variant="outline" className="shrink-0">{candidates.length} values</Badge>
+            <Badge variant="outline" className="shrink-0">
+              {candidates.length} values
+            </Badge>
           </div>
           <div className="mt-4 space-y-3">
             {candidates.map((c, i) => (
@@ -442,7 +468,11 @@ export function ReportsPage() {
               </div>
             ))}
           </div>
-          <Button className="mt-4 w-full sm:w-auto min-h-[48px] touch-press" onClick={() => void confirmAll()} disabled={busy}>
+          <Button
+            className="mt-4 w-full sm:w-auto min-h-[48px] touch-press"
+            onClick={() => void confirmAll()}
+            disabled={busy}
+          >
             <CheckCircle2 className="mr-2 size-4" /> {t("reports.saveAllConfirmed")} (
             {candidates.length})
           </Button>
@@ -459,7 +489,10 @@ export function ReportsPage() {
         ) : (
           <ul className="space-y-2">
             {(data ?? []).map((r) => (
-              <li key={r.id} className="surface flex flex-col sm:flex-row sm:items-center gap-3 p-4">
+              <li
+                key={r.id}
+                className="surface flex flex-col sm:flex-row sm:items-center gap-3 p-4"
+              >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
                     <FileText className="size-5" />
@@ -471,7 +504,10 @@ export function ReportsPage() {
                       {formatReportType(r.reportType, t)}
                     </p>
                   </div>
-                  <Badge variant={r.verificationStatus === "verified" ? "default" : "secondary"} className="shrink-0 text-xs">
+                  <Badge
+                    variant={r.verificationStatus === "verified" ? "default" : "secondary"}
+                    className="shrink-0 text-xs"
+                  >
                     {r.verificationStatus === "verified"
                       ? t("reports.statusVerified")
                       : t("reports.statusPending")}
@@ -479,10 +515,20 @@ export function ReportsPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2 border-t pt-2 sm:border-t-0 sm:pt-0">
-                  <Button variant="outline" size="sm" className="min-h-[36px] flex-1 sm:flex-none text-xs" onClick={() => void openLocal(r)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[36px] flex-1 sm:flex-none text-xs"
+                    onClick={() => void openLocal(r)}
+                  >
                     {t("preview.previewBtn") || "Open"}
                   </Button>
-                  <Button variant="ghost" size="sm" className="min-h-[36px] text-destructive hover:bg-destructive/10 text-xs" onClick={() => void removeReport(r)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-[36px] text-destructive hover:bg-destructive/10 text-xs"
+                    onClick={() => void removeReport(r)}
+                  >
                     {t("common.delete")}
                   </Button>
                 </div>
@@ -512,14 +558,29 @@ function VerifiedValues({ uid, reportId }: { uid: string | null; reportId: strin
             <div className="flex items-center justify-between">
               <p className="font-medium text-sm">{r.testName}</p>
               {r.flag && (
-                <Badge variant={r.flag === "high" ? "destructive" : r.flag === "low" ? "secondary" : "outline"} className="capitalize text-[10px]">
+                <Badge
+                  variant={
+                    r.flag === "high" ? "destructive" : r.flag === "low" ? "secondary" : "outline"
+                  }
+                  className="capitalize text-[10px]"
+                >
                   {r.flag}
                 </Badge>
               )}
             </div>
             <div className="flex items-baseline justify-between text-xs text-muted-foreground">
-              <span>Value: <strong className="text-foreground text-sm">{r.resultValue} {r.unit ?? ""}</strong></span>
-              <span>Ref: {r.referenceLow != null && r.referenceHigh != null ? `${r.referenceLow}–${r.referenceHigh}` : (r.referenceText ?? "—")}</span>
+              <span>
+                Value:{" "}
+                <strong className="text-foreground text-sm">
+                  {r.resultValue} {r.unit ?? ""}
+                </strong>
+              </span>
+              <span>
+                Ref:{" "}
+                {r.referenceLow != null && r.referenceHigh != null
+                  ? `${r.referenceLow}–${r.referenceHigh}`
+                  : (r.referenceText ?? "—")}
+              </span>
             </div>
           </div>
         ))}

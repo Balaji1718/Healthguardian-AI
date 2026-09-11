@@ -231,56 +231,40 @@ check("context explanationSignals has water pattern", context.explanationSignals
 console.log("\n[Test 6: F-005 Emergency Gate Normalization]");
 
 const agentPath = path.resolve("..", "frontend", "src", "features", "agent", "agent.ts");
-let agentContent = await fs.readFile(agentPath, "utf8");
-agentContent = agentContent
-  .replace(/(\w+)\s*\?\s*:/g, "$1:")
-  .replace(/:\s*Array<\{\s*name\s*:\s*string;\s*args\s*:\s*Record<string,\s*unknown>\s*\}>/g, "")
-  .replace(/import\s+[^;]+from\s+"[^"]+";/g, "")
-  .replace(/import\s+type\s+[^;]+;/g, "")
-  .replace(/export\s+interface\s+\w+\s*\{[\s\S]*?\r?\n\}/g, "")
-  .replace(/export\s+async\s+function/g, "async function")
-  .replace(/export\s+function/g, "function")
-  .replace(/export\s+const/g, "const")
-  .replace(/:\s*AgentOutcome\["usedTools"\]/g, "")
-  .replace(/:\s*AgentOutcome\[\]/g, "")
-  .replace(/:\s*AgentOutcome/g, "")
-  .replace(/:\s*TraceEvent\[\]/g, "")
-  .replace(/:\s*PendingAction\s*\|\s*null/g, "")
-  .replace(/:\s*PendingAction/g, "")
-  .replace(/as\s+\{[^}]*\}/g, "")
-  .replace(/:\s*WebSource\[\]/g, "")
-  .replace(/:\s*WebSource/g, "")
-  .replace(/:\s*string\s*\|\s*null/g, "")
-  .replace(/:\s*string\[\]/g, "")
-  .replace(/:\s*string/g, "")
-  .replace(/:\s*boolean/g, "")
-  .replace(/:\s*any/g, "")
-  .replace(/:\s*unknown/g, "")
-  .replace(/:\s*UserIntent/g, "")
-  .replace(/:\s*AIMessage\[\]/g, "")
-  .replace(/:\s*Array<\{[\s\S]*?\}>/g, "")
-  .replace(/:\s*Record<[^>]+>/g, "")
-  .replace(/:\s*Array<[^>]+>/g, "")
-  .replace(/:\s*Promise<[^>]+>/g, "")
-  .replace(/:\s*RunAgentInput/g, "")
-  .replace(/:\s*ValidatedAction\s*\|\s*null/g, "")
-  .replace(/as\s+Error/g, "")
-  .replace(/as\s+AIMessage/g, "")
-  .replace(/:\s*AgentState/g, "")
-  .replace(/:\s*ToolResult/g, "")
-  .replace(/:\s*"answer"\s*\|\s*"ask"\s*\|\s*"propose"\s*\|\s*"timeout"\s*\|\s*"fallback"\s*\|\s*"max_iterations"\s*\|\s*"emergency"\s*\|\s*null/g, "");
+const agentRaw = await fs.readFile(agentPath, "utf8");
+
+function cleanFn(code) {
+  return code
+    .replace(/export\s+/g, "")
+    .replace(/(\w+)\s*\?\s*:/g, "$1:")
+    .replace(/(\w+)\s*\?/g, "$1")
+    .replace(/:\s*string\s*\|\s*null/g, "")
+    .replace(/:\s*string\[\]/g, "")
+    .replace(/:\s*string/g, "")
+    .replace(/:\s*Partial<[^>]+>\s*\|\s*Record<[^>]+>\s*\|\s*null/g, "")
+    .replace(/:\s*["']en["']\s*\|\s*["']ta["']\s*\|\s*["']hi["']/g, "")
+    .replace(/\bas\s+string/g, "");
+}
+
+const normAndEmerg = agentRaw.slice(
+  agentRaw.indexOf("function normalizeText"),
+  agentRaw.indexOf("/* ------------------------------- agent loop -------------------------------- */")
+);
+const sanitize = agentRaw.slice(
+  agentRaw.indexOf("function sanitizeAssistantReply"),
+  agentRaw.indexOf("function finish")
+);
+
+const agentContent = cleanFn(normAndEmerg + "\n\n" + sanitize);
 
 // Compile emergency & sanitize functions safely
 const agentFn = new Function(
-  "validateAction", "TOOL_MAP", "TOOLS", "MEDICAL_DISCLAIMER", "USER_INTENTS",
   `
   ${agentContent}
   return { normalizeText, deterministicEmergencyResponse, sanitizeAssistantReply };
   `
 );
-const { normalizeText, deterministicEmergencyResponse, sanitizeAssistantReply } = agentFn(
-  () => ({ ok: true }), new Map(), [], "disclaimer", []
-);
+const { normalizeText, deterministicEmergencyResponse, sanitizeAssistantReply } = agentFn();
 
 // Emergency phrases
 const emergencyCases = [

@@ -55,3 +55,13 @@ export async function deleteAccount(password: string) {
   await reauthenticateWithCredential(user, cred);
   await deleteUser(user);
 }
+
+export async function getCurrentUserIdToken(): Promise<string | null> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return null;
+  try {
+    return await user.getIdToken();
+  } catch {
+    return null;
+  }
+}

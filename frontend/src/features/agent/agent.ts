@@ -4,6 +4,7 @@ import type { AIMessage } from "@/services/ai/types";
 import { TOOL_MAP, TOOLS, type ToolResult } from "./tools";
 import { validateAction, type ValidatedAction } from "./action-validation";
 import { listCheckins } from "@/services/firebase/repositories";
+import type { DailyCheckin } from "@/models";
 
 export const MAX_TOOL_ITERATIONS = 5;
 const AGENT_TIMEOUT_MS = 60_000;
@@ -245,7 +246,7 @@ export function normalizeText(text: string): string {
 
 export function deterministicEmergencyResponse(
   message: string,
-  latestCheckin?: unknown,
+  latestCheckin?: Partial<DailyCheckin> | Record<string, unknown> | null,
   language: "en" | "ta" | "hi" = "en",
 ): string | null {
   const normalized = normalizeText(message);
@@ -270,7 +271,12 @@ export function deterministicEmergencyResponse(
   let checkinHasBreathing = false;
   let checkinHasFainting = false;
 
-  if (latestCheckin && Array.isArray(latestCheckin.symptoms)) {
+  if (
+    latestCheckin &&
+    typeof latestCheckin === "object" &&
+    "symptoms" in latestCheckin &&
+    Array.isArray(latestCheckin.symptoms)
+  ) {
     const symptoms = latestCheckin.symptoms.map((s: string) => s.toLowerCase());
     checkinHasChest = symptoms.some(
       (s: string) => s.includes("chest") || s.includes("நெஞ்சு") || s.includes("सीने"),
@@ -669,7 +675,7 @@ async function runAgentV2({
                 url: item.url,
                 domain: item.domain || "web",
                 snippet: item.snippet || "",
-                publishedAt: item.publishedAt,
+                ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
               });
             }
           }

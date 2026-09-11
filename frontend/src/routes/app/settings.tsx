@@ -217,6 +217,10 @@ function SettingsPage() {
       )
     )
       return;
+    if (!uid) {
+      toast.error("Not signed in");
+      return;
+    }
     try {
       await deleteAllHealthData(uid);
       await deleteAllLocalDocuments(uid);

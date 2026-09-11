@@ -33,9 +33,7 @@ export function AppLoadingScreen({ label, sublabel }: AppLoadingScreenProps) {
         </h1>
 
         {/* Status Message */}
-        <p className="text-xs sm:text-sm text-muted-foreground mb-6 font-medium">
-          {title}
-        </p>
+        <p className="text-xs sm:text-sm text-muted-foreground mb-6 font-medium">{title}</p>
 
         {/* Sleek Progress Bar */}
         <div className="w-44 h-1.5 bg-muted rounded-full overflow-hidden relative">

@@ -4,9 +4,15 @@
  */
 
 import type { DetectedPattern } from "@/features/healthRisk/engine";
-import type { AppNotification, HealthGoal } from "@/models";
+import type { AppNotification, Goal } from "@/models";
+
+export type HealthGoal = Goal;
 
 type TranslationFn = (key: string, params?: Record<string, string | number>) => string;
+
+function str(v: unknown, fallback = ""): string {
+  return typeof v === "string" && v ? v : typeof v === "number" ? String(v) : fallback;
+}
 
 /**
  * Localizes a risk factor identifier into a user-facing title.
@@ -52,7 +58,10 @@ export function formatPatternDetail(
   pattern: DetectedPattern | { factor?: string; detail?: string; message?: string },
   t: TranslationFn,
 ): string {
-  const text = pattern.message || pattern.detail || "";
+  const text =
+    ("message" in pattern && typeof pattern.message === "string" ? pattern.message : undefined) ||
+    pattern.detail ||
+    "";
   if (!text) return "";
 
   // 1. Sleep deviation: "Recent sleep is 2.0h lower than your usual pattern of 8.0h."
@@ -60,7 +69,10 @@ export function formatPatternDetail(
     /Recent sleep is ([\d.]+)h lower than your usual pattern of ([\d.]+)h\./i,
   );
   if (sleepDevMatch) {
-    return t("risk.patternDetails.sleepDev", { dev: sleepDevMatch[1], baseline: sleepDevMatch[2] });
+    return t("risk.patternDetails.sleepDev", {
+      dev: str(sleepDevMatch[1]),
+      baseline: str(sleepDevMatch[2]),
+    });
   }
 
   // 2. Activity deviation: "Recent activity is 15 min/day below your usual pattern of 40 min."
@@ -69,8 +81,8 @@ export function formatPatternDetail(
   );
   if (actDevMatch) {
     return t("risk.patternDetails.lowActivityDev", {
-      dev: actDevMatch[1],
-      baseline: actDevMatch[2],
+      dev: str(actDevMatch[1]),
+      baseline: str(actDevMatch[2]),
     });
   }
 
@@ -79,7 +91,10 @@ export function formatPatternDetail(
     /Recent water(?: intake)? is ([\d.]+) glasses below your usual pattern of ([\d.]+) glasses\./i,
   );
   if (waterDevMatch) {
-    return t("risk.patternDetails.waterDev", { dev: waterDevMatch[1], baseline: waterDevMatch[2] });
+    return t("risk.patternDetails.waterDev", {
+      dev: str(waterDevMatch[1]),
+      baseline: str(waterDevMatch[2]),
+    });
   }
 
   // 4. Sleep decline: "Sleep went from 8.0h to 6.0h across your last 4 entries."
@@ -88,16 +103,16 @@ export function formatPatternDetail(
   );
   if (sleepDeclineMatch) {
     return t("risk.patternDetails.sleepDecline", {
-      start: sleepDeclineMatch[1],
-      end: sleepDeclineMatch[2],
-      count: sleepDeclineMatch[3],
+      start: str(sleepDeclineMatch[1]),
+      end: str(sleepDeclineMatch[2]),
+      count: str(sleepDeclineMatch[3]),
     });
   }
 
   // 5. Sleep average: "Average sleep is 5.5h."
   const sleepAvgMatch = text.match(/Average sleep is ([\d.]+)h\./i);
   if (sleepAvgMatch) {
-    return t("risk.patternDetails.sleepAvg", { avg: sleepAvgMatch[1] });
+    return t("risk.patternDetails.sleepAvg", { avg: str(sleepAvgMatch[1]) });
   }
 
   // 6. No activity: "No activity logged in recent entries."
@@ -108,39 +123,42 @@ export function formatPatternDetail(
   // 7. Activity average: "Average 15 min/day recently."
   const actAvgMatch = text.match(/Average ([\d.]+) min\/day recently\./i);
   if (actAvgMatch) {
-    return t("risk.patternDetails.lowActivityAvg", { avg: actAvgMatch[1] });
+    return t("risk.patternDetails.lowActivityAvg", { avg: str(actAvgMatch[1]) });
   }
 
   // 8. Water average: "Average 3.5 glasses/day recently."
   const waterAvgMatch = text.match(/Average ([\d.]+) glasses\/day recently\./i);
   if (waterAvgMatch) {
-    return t("risk.patternDetails.waterAvg", { avg: waterAvgMatch[1] });
+    return t("risk.patternDetails.waterAvg", { avg: str(waterAvgMatch[1]) });
   }
 
   // 9. Weight increase: "Weight increased by 2.5kg over your last 5 entries."
   const weightMatch = text.match(/Weight increased by ([\d.]+)kg over your last (\d+) entries\./i);
   if (weightMatch) {
-    return t("risk.patternDetails.weightIncrease", { gain: weightMatch[1], count: weightMatch[2] });
+    return t("risk.patternDetails.weightIncrease", {
+      gain: str(weightMatch[1]),
+      count: str(weightMatch[2]),
+    });
   }
 
   // 10. Elevated BP: "Recent readings average 135/88 mmHg."
   const bpMatch = text.match(/Recent readings average (\d+)\/(\d+) mmHg\./i);
   if (bpMatch) {
-    return t("risk.patternDetails.elevatedBP", { sys: bpMatch[1], dia: bpMatch[2] });
+    return t("risk.patternDetails.elevatedBP", { sys: str(bpMatch[1]), dia: str(bpMatch[2]) });
   }
 
   // 11. Elevated Glucose: "Recent fasting readings average 115 mg/dL."
   const glucoseMatch = text.match(/Recent fasting readings average ([\d.]+) mg\/dL\./i);
   if (glucoseMatch) {
-    return t("risk.patternDetails.elevatedGlucose", { avg: glucoseMatch[1] });
+    return t("risk.patternDetails.elevatedGlucose", { avg: str(glucoseMatch[1]) });
   }
 
   // 12. Frequent headaches: "Headache logged 3 times in the last 14 days."
   const headacheMatch = text.match(/Headache logged (\d+) times in the last (\d+) days\./i);
   if (headacheMatch) {
     return t("risk.patternDetails.frequentHeadaches", {
-      count: headacheMatch[1],
-      days: headacheMatch[2],
+      count: str(headacheMatch[1]),
+      days: str(headacheMatch[2]),
     });
   }
 
@@ -148,15 +166,15 @@ export function formatPatternDetail(
   const symptomMatch = text.match(/(.+) logged (\d+) times recently\./i);
   if (symptomMatch) {
     return t("risk.patternDetails.repeatedSymptoms", {
-      symptom: symptomMatch[1],
-      count: symptomMatch[2],
+      symptom: str(symptomMatch[1]),
+      count: str(symptomMatch[2]),
     });
   }
 
   // 14. Lab abnormalities: "2 lab test(s) outside normal reference range."
   const labMatch = text.match(/(\d+) lab test\(s\) outside normal reference range\./i);
   if (labMatch) {
-    return t("risk.patternDetails.labAbnormal", { count: labMatch[1] });
+    return t("risk.patternDetails.labAbnormal", { count: str(labMatch[1]) });
   }
 
   return text;
@@ -174,12 +192,12 @@ export function formatAdaptiveSignal(signal: string, t: TranslationFn): string {
     /Recent (.+?) is ([\d.]+)\s*(\w+)? (above|below) your usual pattern of ([\d.]+)\s*(\w+)?\./i,
   );
 
-  if (signalMatch) {
+  if (signalMatch && signalMatch[1] && signalMatch[2] && signalMatch[4] && signalMatch[5]) {
     const rawMetric = signalMatch[1].trim().toLowerCase();
-    const dev = signalMatch[2];
-    const unit = signalMatch[3] || "";
+    const dev = str(signalMatch[2]);
+    const unit = str(signalMatch[3]);
     const direction = signalMatch[4].toLowerCase();
-    const baseline = signalMatch[5];
+    const baseline = str(signalMatch[5]);
 
     if (rawMetric.includes("sleep")) {
       return direction === "below"
@@ -223,30 +241,39 @@ export function formatScoreContribution(
   const sleepMatch = text.match(
     /Recent sleep is ([\d.]+)h lower than your usual pattern of ([\d.]+)h\./i,
   );
-  if (sleepMatch) {
-    return t("dashboard.contributions.sleepLower", { dev: sleepMatch[1], baseline: sleepMatch[2] });
+  if (sleepMatch && sleepMatch[1] && sleepMatch[2]) {
+    return t("dashboard.contributions.sleepLower", {
+      dev: str(sleepMatch[1]),
+      baseline: str(sleepMatch[2]),
+    });
   }
 
   // "Recent activity is 15 min/day below your usual pattern of 40 min."
   const actMatch = text.match(
     /Recent activity is ([\d.]+) min\/day below your usual pattern of ([\d.]+) min\./i,
   );
-  if (actMatch) {
-    return t("dashboard.contributions.activityBelow", { dev: actMatch[1], baseline: actMatch[2] });
+  if (actMatch && actMatch[1] && actMatch[2]) {
+    return t("dashboard.contributions.activityBelow", {
+      dev: str(actMatch[1]),
+      baseline: str(actMatch[2]),
+    });
   }
 
   // "Recent water intake is 2.0 glasses below your usual pattern of 7.0 glasses."
   const waterMatch = text.match(
     /Recent water(?: intake)? is ([\d.]+) glasses below your usual pattern of ([\d.]+) glasses\./i,
   );
-  if (waterMatch) {
-    return t("dashboard.contributions.waterBelow", { dev: waterMatch[1], baseline: waterMatch[2] });
+  if (waterMatch && waterMatch[1] && waterMatch[2]) {
+    return t("dashboard.contributions.waterBelow", {
+      dev: str(waterMatch[1]),
+      baseline: str(waterMatch[2]),
+    });
   }
 
   // "5 check-ins in the last week"
   const checkinsMatch = text.match(/(\d+) check-ins in the last week/i);
-  if (checkinsMatch) {
-    return t("dashboard.contributions.checkinsCount", { count: checkinsMatch[1] });
+  if (checkinsMatch && checkinsMatch[1]) {
+    return t("dashboard.contributions.checkinsCount", { count: str(checkinsMatch[1]) });
   }
 
   // Static positive contributions

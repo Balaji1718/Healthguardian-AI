@@ -218,7 +218,9 @@
 
 /* Mobile-first touch & scrolling utilities */
 @utility touch-press {
-  transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.12s ease;
+  transition:
+    transform 0.12s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.12s ease;
   &:active {
     transform: scale(0.96);
     opacity: 0.9;

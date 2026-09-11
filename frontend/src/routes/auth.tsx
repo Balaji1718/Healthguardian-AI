@@ -1,14 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Heart,
-  Loader2,
-  Mail,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, Heart, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -22,6 +14,7 @@ import { useAuthListener } from "@/features/auth/useAuth";
 import { MEDICAL_DISCLAIMER } from "@/core/constants/health";
 import { LanguageSelector } from "@/features/i18n/LanguageSelector";
 import { useTranslation } from "@/locales/i18n";
+import { AppLoadingScreen } from "@/components/common/AppLoadingScreen";
 
 const searchSchema = z.object({ mode: z.enum(["login", "register", "forgot"]).optional() });
 
@@ -81,24 +74,7 @@ function AuthPage() {
 
   if (loading || user) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md space-y-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 font-semibold text-foreground">
-              <Heart className="size-5 text-primary" /> {t("common.appName")}
-            </Link>
-            <LanguageSelector variant="auth" />
-          </div>
-          <div className="surface p-8 text-center space-y-3">
-            <Loader2 className="size-6 animate-spin text-primary mx-auto" />
-            <p className="text-sm text-muted-foreground">
-              {user
-                ? (t("auth.redirectingToDashboard") || "Redirecting to your dashboard…")
-                : (t("auth.checkingSession") || "Checking session…")}
-            </p>
-          </div>
-        </div>
-      </div>
+      <AppLoadingScreen label={t("auth.checkingSession")} sublabel={t("auth.restoringProfile")} />
     );
   }
 
@@ -175,164 +151,162 @@ function AuthPage() {
 
         <div className="surface p-6">
           {authMode === "forgot" ? (
-              <div className="space-y-4">
-                <button
-                  type="button"
-                  onClick={() => changeMode("login")}
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <ArrowLeft className="size-3.5" /> {t("auth.backToSignIn")}
-                </button>
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => changeMode("login")}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <ArrowLeft className="size-3.5" /> {t("auth.backToSignIn")}
+              </button>
 
-                <div>
-                  <h1 className="text-xl font-semibold text-foreground">
-                    {t("auth.forgotPassword")}
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Enter your email to receive password recovery instructions.
-                  </p>
-                </div>
-
-                {resetSent ? (
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-primary font-medium text-sm">
-                      <CheckCircle2 className="size-4" /> Recovery Email Sent
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {t("auth.resetEmailSent")}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-xs"
-                      onClick={() => changeMode("login")}
-                    >
-                      {t("auth.backToSignIn")}
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={submitForgot} className="space-y-4" noValidate>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="forgot-email">{t("auth.email")}</Label>
-                      <div className="relative">
-                        <Input
-                          id="forgot-email"
-                          type="email"
-                          autoComplete="email"
-                          placeholder="name@example.com"
-                          value={form.email}
-                          onChange={(e) => setForm({ ...form, email: e.target.value })}
-                          className="pr-10"
-                        />
-                        <Mail className="absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                      {errors["email"] && (
-                        <p className="text-xs text-destructive">{errors["email"]}</p>
-                      )}
-                    </div>
-
-                    <Button type="submit" className="w-full" disabled={busy}>
-                      {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-                      {t("auth.sendResetEmail")}
-                    </Button>
-                  </form>
-                )}
-              </div>
-            ) : (
-              <>
+              <div>
                 <h1 className="text-xl font-semibold text-foreground">
-                  {authMode === "register" ? t("auth.createAccount") : t("auth.welcome")}
+                  {t("auth.forgotPassword")}
                 </h1>
-                <p className="mt-1 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Enter your email to receive password recovery instructions.
+                </p>
+              </div>
 
-                <form className="mt-5 space-y-4" onSubmit={submitAuth} noValidate>
-                  {authMode === "register" && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="displayName">{t("auth.fullName")}</Label>
-                      <Input
-                        id="displayName"
-                        value={form.displayName}
-                        autoComplete="name"
-                        placeholder="Alex Morgan"
-                        onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                      />
-                      {errors["displayName"] && (
-                        <p className="text-xs text-destructive">{errors["displayName"]}</p>
-                      )}
-                    </div>
-                  )}
-
+              {resetSent ? (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                    <CheckCircle2 className="size-4" /> Recovery Email Sent
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t("auth.resetEmailSent")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => changeMode("login")}
+                  >
+                    {t("auth.backToSignIn")}
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={submitForgot} className="space-y-4" noValidate>
                   <div className="space-y-1.5">
-                    <Label htmlFor="email">{t("auth.email")}</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="name@example.com"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
+                    <Label htmlFor="forgot-email">{t("auth.email")}</Label>
+                    <div className="relative">
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        autoComplete="email"
+                        placeholder="name@example.com"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="pr-10"
+                      />
+                      <Mail className="absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground pointer-events-none" />
+                    </div>
                     {errors["email"] && (
                       <p className="text-xs text-destructive">{errors["email"]}</p>
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password">{t("auth.password")}</Label>
-                      {authMode === "login" && (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                          onClick={() => changeMode("forgot")}
-                        >
-                          {t("auth.forgotPassword")}
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete={authMode === "register" ? "new-password" : "current-password"}
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
-                        className="absolute inset-y-0 right-3 flex items-center text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                        onClick={() => setShowPassword((value) => !value)}
-                      >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                    {errors["password"] && (
-                      <p className="text-xs text-destructive">{errors["password"]}</p>
-                    )}
-                  </div>
-
                   <Button type="submit" className="w-full" disabled={busy}>
                     {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {authMode === "register" ? t("auth.createAccount") : t("auth.signIn")}
+                    {t("auth.sendResetEmail")}
                   </Button>
                 </form>
+              )}
+            </div>
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold text-foreground">
+                {authMode === "register" ? t("auth.createAccount") : t("auth.welcome")}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
 
-                <div className="mt-4 text-center text-sm border-t pt-3">
-                  <button
-                    type="button"
-                    className="text-primary hover:underline text-xs font-medium cursor-pointer"
-                    onClick={() => changeMode(authMode === "register" ? "login" : "register")}
-                  >
-                    {authMode === "register"
-                      ? t("auth.alreadyHaveAccount")
-                      : t("auth.dontHaveAccount")}
-                  </button>
+              <form className="mt-5 space-y-4" onSubmit={submitAuth} noValidate>
+                {authMode === "register" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="displayName">{t("auth.fullName")}</Label>
+                    <Input
+                      id="displayName"
+                      value={form.displayName}
+                      autoComplete="name"
+                      placeholder="Alex Morgan"
+                      onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                    />
+                    {errors["displayName"] && (
+                      <p className="text-xs text-destructive">{errors["displayName"]}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">{t("auth.email")}</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="name@example.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  />
+                  {errors["email"] && <p className="text-xs text-destructive">{errors["email"]}</p>}
                 </div>
-              </>
-            )}
-          </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">{t("auth.password")}</Label>
+                    {authMode === "login" && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                        onClick={() => changeMode("forgot")}
+                      >
+                        {t("auth.forgotPassword")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+                      className="absolute inset-y-0 right-3 flex items-center text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                      onClick={() => setShowPassword((value) => !value)}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                  {errors["password"] && (
+                    <p className="text-xs text-destructive">{errors["password"]}</p>
+                  )}
+                </div>
+
+                <Button type="submit" className="w-full" disabled={busy}>
+                  {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  {authMode === "register" ? t("auth.createAccount") : t("auth.signIn")}
+                </Button>
+              </form>
+
+              <div className="mt-4 text-center text-sm border-t pt-3">
+                <button
+                  type="button"
+                  className="text-primary hover:underline text-xs font-medium cursor-pointer"
+                  onClick={() => changeMode(authMode === "register" ? "login" : "register")}
+                >
+                  {authMode === "register"
+                    ? t("auth.alreadyHaveAccount")
+                    : t("auth.dontHaveAccount")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         <p className="mt-6 text-xs leading-relaxed text-muted-foreground text-center">
           {t("common.medicalDisclaimer")}

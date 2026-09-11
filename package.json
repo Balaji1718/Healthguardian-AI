@@ -1,5 +1,6 @@
 {
   "name": "healthguardian-ai",
+  "type": "module",
   "private": true,
   "version": "1.0.0",
   "engines": {
@@ -14,6 +15,7 @@
     "test:ai-router": "npm --prefix backend run test:ai-router",
     "test:i18n": "node backend/test-i18n-completeness.js && node backend/test-i18n-runtime-audit.js",
     "lint": "npm --prefix frontend run lint",
+    "security:audit": "node scripts/package-clean.js --dry-run",
     "build": "npm --prefix frontend run build",
     "build:frontend": "npm --prefix frontend run build",
     "start": "npm --prefix backend start",

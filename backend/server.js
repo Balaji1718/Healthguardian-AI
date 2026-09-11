@@ -14,7 +14,7 @@ import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeComple
 import { executeWebSearch } from './web-search.js';
 import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
 import { interpretUserInput } from './interpretation-orchestrator.js';
-import { sendUserPush } from './firebase-admin.js';
+import { sendUserPush, verifyIdToken, getAdminApp } from './firebase-admin.js';
 
 const frontendRoot = path.resolve(__dirname, '../frontend');
 const isProduction = process.env.NODE_ENV === 'production';
@@ -196,10 +196,36 @@ app.post('/api/support/email', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/send', async (req, res) => {
-  if (!process.env.FCM_INTERNAL_SECRET || req.get('x-fcm-internal-secret') !== process.env.FCM_INTERNAL_SECRET) {
-    return res.status(401).json({ ok: false, error: 'Unauthorized.' });
+async function authenticateNotificationRequest(req, res, next) {
+  const secret = process.env.FCM_INTERNAL_SECRET;
+  const headerSecret = req.get('x-fcm-internal-secret');
+  if (secret && headerSecret === secret) {
+    return next();
   }
+
+  const authHeader = req.get('authorization') || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const idToken = authHeader.slice(7).trim();
+    const decoded = await verifyIdToken(idToken);
+    if (decoded) {
+      const requestedUid = req.body?.uid;
+      if (requestedUid && decoded.uid !== requestedUid) {
+        return res.status(403).json({ ok: false, error: 'Forbidden: uid mismatch.' });
+      }
+      req.user = decoded;
+      return next();
+    }
+  }
+
+  // Allow local mock/development if Firebase admin credentials are not configured
+  if (!isProduction && !process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_PRIVATE_KEY) {
+    return next();
+  }
+
+  return res.status(401).json({ ok: false, error: 'Unauthorized: missing or invalid authentication token.' });
+}
+
+app.post('/api/notifications/send', authenticateNotificationRequest, async (req, res) => {
   const { uid, title, body, data } = req.body ?? {};
   if (typeof uid !== 'string' || typeof title !== 'string' || typeof body !== 'string') {
     return res.status(400).json({ ok: false, error: 'uid, title, and body are required.' });
@@ -211,7 +237,7 @@ app.post('/api/notifications/send', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/dispatch-push', async (req, res) => {
+app.post('/api/notifications/dispatch-push', authenticateNotificationRequest, async (req, res) => {
   const { uid, title, body, data } = req.body ?? {};
   if (typeof uid !== 'string' || typeof title !== 'string' || typeof body !== 'string') {
     return res.status(400).json({ ok: false, error: 'uid, title, and body are required.' });
@@ -224,7 +250,7 @@ app.post('/api/notifications/dispatch-push', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/register-token', async (req, res) => {
+app.post('/api/notifications/register-token', authenticateNotificationRequest, async (req, res) => {
   const { uid, token } = req.body ?? {};
   if (typeof uid !== 'string' || typeof token !== 'string') {
     return res.status(400).json({ ok: false, error: 'uid and token are required.' });
@@ -243,7 +269,7 @@ app.post('/api/notifications/register-token', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/schedule-test-push', async (req, res) => {
+app.post('/api/notifications/schedule-test-push', authenticateNotificationRequest, async (req, res) => {
   const { uid, delaySeconds = 10, lang = 'en' } = req.body ?? {};
   if (typeof uid !== 'string') {
     return res.status(400).json({ ok: false, error: 'uid is required.' });
@@ -264,14 +290,35 @@ app.post('/api/notifications/schedule-test-push', async (req, res) => {
   const body = bodies[lang] || bodies.en;
   const delay = Math.max(1, Math.min(60, Number(delaySeconds) || 10));
 
+  // Durable tracking: Write scheduled record to Firestore
+  let scheduledDocId = null;
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const db = getFirestore();
+    const scheduledRef = await db.collection('users').doc(uid).collection('scheduledNotifications').add({
+      type: 'test_alert',
+      title,
+      body,
+      status: 'scheduled',
+      scheduledFor: new Date(Date.now() + delay * 1000),
+      createdAt: new Date(),
+      delaySeconds: delay,
+    });
+    scheduledDocId = scheduledRef.id;
+  } catch (err) {
+    console.warn('[Scheduled Push] Could not write durable scheduled record:', err.message);
+  }
+
   res.status(200).json({
     ok: true,
     scheduled: true,
+    scheduledId: scheduledDocId,
     delaySeconds: delay,
     message: `Server scheduled FCM push in ${delay}s. You can now close or clear the app from Recent Apps!`,
   });
 
   setTimeout(async () => {
+    let pushResult = null;
     try {
       // 1. Record in-app notification in Firestore so it appears in the notification center
       const { getFirestore } = await import('firebase-admin/firestore');
@@ -288,13 +335,31 @@ app.post('/api/notifications/schedule-test-push', async (req, res) => {
       });
 
       // 2. Dispatch real FCM push to all registered devices (wakes lock screen and notification tray)
-      await sendUserPush(uid, title, body, {
+      pushResult = await sendUserPush(uid, title, body, {
         type: 'test_alert',
         scheduled: 'true',
         deliveredAt: new Date().toISOString(),
       });
+
+      if (scheduledDocId) {
+        await db.collection('users').doc(uid).collection('scheduledNotifications').doc(scheduledDocId).update({
+          status: pushResult?.delivered ? 'delivered' : 'failed',
+          deliveredAt: new Date(),
+          deliveryResult: pushResult,
+        });
+      }
     } catch (err) {
       console.warn('Scheduled push error:', err.message);
+      if (scheduledDocId) {
+        try {
+          const { getFirestore } = await import('firebase-admin/firestore');
+          const db = getFirestore();
+          await db.collection('users').doc(uid).collection('scheduledNotifications').doc(scheduledDocId).update({
+            status: 'failed',
+            error: err.message,
+          });
+        } catch {}
+      }
     }
   }, delay * 1000);
 });

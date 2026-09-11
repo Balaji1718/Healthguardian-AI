@@ -19,9 +19,10 @@ export function FileThumbnail({ entry, className = "size-8" }: FileThumbnailProp
     let url: string | null = null;
 
     if (isImage && entry.fileHandle && !loadFailed) {
+      const handle = entry.fileHandle;
       void (async () => {
         try {
-          const file = await entry.fileHandle.getFile();
+          const file = await handle.getFile();
           if (cancelled) return;
           url = URL.createObjectURL(file);
           setThumbUrl(url);

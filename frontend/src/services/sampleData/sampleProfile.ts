@@ -28,13 +28,76 @@ export function setSampleProfileActive(active: boolean): void {
  */
 export async function loadSampleHealthProfile(uid: string): Promise<void> {
   const sampleHabits = [
-    { sleep: 7.5, water: 7, exercise: 30, type: "Walking", sys: 120, dia: 80, bg: 92, mood: "great" as const },
-    { sleep: 7.0, water: 6, exercise: 25, type: "Jogging", sys: 118, dia: 78, bg: 95, mood: "good" as const },
-    { sleep: 6.5, water: 8, exercise: 40, type: "Cycling", sys: 122, dia: 82, bg: 96, mood: "good" as const },
-    { sleep: 7.0, water: 7, exercise: 30, type: "Walking", sys: 121, dia: 80, bg: 94, mood: "great" as const },
-    { sleep: 8.0, water: 6, exercise: 35, type: "Yoga", sys: 119, dia: 79, bg: 90, mood: "great" as const },
-    { sleep: 7.5, water: 8, exercise: 30, type: "Walking", sys: 120, dia: 80, bg: 93, mood: "good" as const },
-    { sleep: 7.5, water: 7, exercise: 30, type: "Walking", sys: 120, dia: 80, bg: 92, mood: "great" as const },
+    {
+      sleep: 7.5,
+      water: 7,
+      exercise: 30,
+      type: "Walking",
+      sys: 120,
+      dia: 80,
+      bg: 92,
+      mood: "great" as const,
+    },
+    {
+      sleep: 7.0,
+      water: 6,
+      exercise: 25,
+      type: "Jogging",
+      sys: 118,
+      dia: 78,
+      bg: 95,
+      mood: "good" as const,
+    },
+    {
+      sleep: 6.5,
+      water: 8,
+      exercise: 40,
+      type: "Cycling",
+      sys: 122,
+      dia: 82,
+      bg: 96,
+      mood: "good" as const,
+    },
+    {
+      sleep: 7.0,
+      water: 7,
+      exercise: 30,
+      type: "Walking",
+      sys: 121,
+      dia: 80,
+      bg: 94,
+      mood: "great" as const,
+    },
+    {
+      sleep: 8.0,
+      water: 6,
+      exercise: 35,
+      type: "Yoga",
+      sys: 119,
+      dia: 79,
+      bg: 90,
+      mood: "great" as const,
+    },
+    {
+      sleep: 7.5,
+      water: 8,
+      exercise: 30,
+      type: "Walking",
+      sys: 120,
+      dia: 80,
+      bg: 93,
+      mood: "good" as const,
+    },
+    {
+      sleep: 7.5,
+      water: 7,
+      exercise: 30,
+      type: "Walking",
+      sys: 120,
+      dia: 80,
+      bg: 92,
+      mood: "great" as const,
+    },
   ];
 
   const now = new Date();
@@ -51,12 +114,12 @@ export async function loadSampleHealthProfile(uid: string): Promise<void> {
       waterGlasses: data.water,
       exerciseMinutes: data.exercise,
       exerciseType: data.type,
-      systolicBp: data.sys,
-      diastolicBp: data.dia,
-      fastingBloodGlucose: data.bg,
+      systolicBP: data.sys,
+      diastolicBP: data.dia,
+      bloodGlucose: data.bg,
       wellbeing: data.mood,
       notes: i === 0 ? "Felt energized after morning walk." : undefined,
-      provenance: "manual",
+      source: "manual",
       verificationStatus: "user_verified",
     });
   }
@@ -64,13 +127,15 @@ export async function loadSampleHealthProfile(uid: string): Promise<void> {
   // Create an active goal
   try {
     await createGoal(uid, {
+      goalType: "sleep",
       title: "Daily Hydration & Sleep Rhythm",
       description: "Maintain 7+ hours of sleep and at least 6 glasses of water daily.",
       targetValue: 7,
-      currentValue: 7,
+      progressValue: 7,
       unit: "hours",
+      frequency: "daily",
+      startDate: new Date(),
       status: "active",
-      category: "sleep",
     });
   } catch {
     // Goal creation is non-blocking for sample load

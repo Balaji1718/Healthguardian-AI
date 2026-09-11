@@ -50,6 +50,7 @@ import type {
   SupportRequest,
   UserRoot,
 } from "@/models";
+import { syncAdaptiveNotifications } from "../notifications/adaptive";
 
 /** Firestore rejects `undefined`; unknown values must be omitted, never faked as 0. */
 export function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
@@ -174,6 +175,16 @@ export async function saveCheckin(uid: string, date: Date, data: Partial<DailyCh
     { merge: true },
   );
   await syncCheckinToHealthRecords(uid, id, date, data);
+  await syncCheckinToGoals(uid, date, data);
+
+  // Proactive evaluation of adaptive notifications upon saving check-in
+  try {
+    const recentCheckins = await listCheckins(uid, 30);
+    void syncAdaptiveNotifications(uid, recentCheckins);
+  } catch (err) {
+    console.warn("Adaptive notifications sync error:", err);
+  }
+
   return id;
 }
 
@@ -328,6 +339,98 @@ export async function deleteGoal(uid: string, id: string) {
 export async function listGoals(uid: string, max = 50): Promise<Goal[]> {
   const snap = await getDocs(query(goalsCol(uid), orderBy("createdAt", "desc"), fbLimit(max)));
   return snap.docs.map((d) => map<Goal>(d));
+}
+
+/**
+ * Automatically updates active user goals based on logged check-in data.
+ */
+export async function syncCheckinToGoals(uid: string, _date: Date, data: Partial<DailyCheckin>) {
+  try {
+    const goals = await listGoals(uid, 50);
+    const activeGoals = goals.filter((g) => g.status === "active");
+    if (activeGoals.length === 0) return;
+
+    for (const goal of activeGoals) {
+      let updatedProgress: number | null = null;
+
+      switch (goal.goalType) {
+        case "exercise":
+          if (data.exerciseMinutes != null && !Number.isNaN(data.exerciseMinutes)) {
+            if (goal.frequency === "daily") {
+              updatedProgress = data.exerciseMinutes;
+            } else if (goal.frequency === "weekly") {
+              const recent = await listCheckins(uid, 7);
+              const total = recent.reduce((sum, c) => sum + (c.exerciseMinutes || 0), 0);
+              updatedProgress = total;
+            } else {
+              updatedProgress = data.exerciseMinutes;
+            }
+          }
+          break;
+
+        case "water":
+          if (data.waterGlasses != null && !Number.isNaN(data.waterGlasses)) {
+            if (goal.frequency === "daily") {
+              updatedProgress = data.waterGlasses;
+            } else if (goal.frequency === "weekly") {
+              const recent = await listCheckins(uid, 7);
+              const total = recent.reduce((sum, c) => sum + (c.waterGlasses || 0), 0);
+              updatedProgress = total;
+            } else {
+              updatedProgress = data.waterGlasses;
+            }
+          }
+          break;
+
+        case "sleep":
+          if (data.sleepHours != null && !Number.isNaN(data.sleepHours)) {
+            if (goal.frequency === "daily") {
+              updatedProgress = data.sleepHours;
+            } else if (goal.frequency === "weekly") {
+              const recent = await listCheckins(uid, 7);
+              const avg = recent.length
+                ? recent.reduce((sum, c) => sum + (c.sleepHours || 0), 0) / recent.length
+                : data.sleepHours;
+              updatedProgress = Math.round(avg * 10) / 10;
+            } else {
+              updatedProgress = data.sleepHours;
+            }
+          }
+          break;
+
+        case "weight":
+          if (data.weightKg != null && !Number.isNaN(data.weightKg)) {
+            updatedProgress = data.weightKg;
+          }
+          break;
+
+        case "checkin_consistency": {
+          const recent = await listCheckins(uid, 7);
+          updatedProgress = recent.length;
+          break;
+        }
+
+        default:
+          break;
+      }
+
+      if (updatedProgress !== null && goal.id) {
+        const isCompleted =
+          goal.targetValue != null &&
+          goal.targetValue > 0 &&
+          (goal.goalType === "weight"
+            ? updatedProgress <= goal.targetValue
+            : updatedProgress >= goal.targetValue);
+
+        await updateGoal(uid, goal.id, {
+          progressValue: updatedProgress,
+          ...(isCompleted ? { status: "completed" } : {}),
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Goals sync error:", err);
+  }
 }
 
 /* ------------------------------ notifications ----------------------------- */

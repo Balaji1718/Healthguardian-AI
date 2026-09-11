@@ -72,11 +72,12 @@ export function UnifiedCheckinComposer({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const activePlaceholders = LOCALIZED_PLACEHOLDERS[language] || LOCALIZED_PLACEHOLDERS.en;
+  const activePlaceholders: string[] =
+    LOCALIZED_PLACEHOLDERS[language] ?? LOCALIZED_PLACEHOLDERS["en"] ?? [];
 
   // Rotate placeholders subtly every 6 seconds when input is empty
   useEffect(() => {
-    if (inputText.trim()) return;
+    if (inputText.trim() || activePlaceholders.length === 0) return;
     const interval = setInterval(() => {
       setPlaceholderIndex((prev) => (prev + 1) % activePlaceholders.length);
     }, 6000);
@@ -188,7 +189,10 @@ export function UnifiedCheckinComposer({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={() => setIsRecordingVoice(true)} className="gap-2.5 py-2 cursor-pointer">
+                <DropdownMenuItem
+                  onClick={() => setIsRecordingVoice(true)}
+                  className="gap-2.5 py-2 cursor-pointer"
+                >
                   <Mic className="size-4 text-primary" />
                   <div>
                     <span className="font-medium block">Voice Check-in</span>
@@ -232,7 +236,11 @@ export function UnifiedCheckinComposer({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={activePlaceholders[placeholderIndex] || activePlaceholders[0]}
+                placeholder={
+                  activePlaceholders[placeholderIndex] ||
+                  activePlaceholders[0] ||
+                  "Describe your health today..."
+                }
                 disabled={extracting}
                 className="w-full bg-transparent border-0 resize-none py-1.5 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none leading-relaxed"
                 aria-label="Health check-in message"

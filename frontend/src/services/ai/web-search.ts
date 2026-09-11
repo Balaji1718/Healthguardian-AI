@@ -38,7 +38,7 @@ export async function performWebSearch(query: string): Promise<WebSearchResponse
       ok: Boolean(data?.ok),
       query: data?.query || query,
       results: Array.isArray(data?.results) ? data.results : [],
-      source: data?.source,
+      ...(data?.source ? { source: data.source } : {}),
     };
   } catch (err) {
     // Graceful offline fallback with public health reference

@@ -44,7 +44,7 @@ export function GuidedTourModal({
     }
   }, [open, initialStepIndex]);
 
-  const step = GUIDED_TOUR_STEPS[currentStepIndex] || GUIDED_TOUR_STEPS[0];
+  const step = GUIDED_TOUR_STEPS[currentStepIndex] ?? GUIDED_TOUR_STEPS[0]!;
   const totalSteps = GUIDED_TOUR_STEPS.length;
   const progressPercent = Math.round(((currentStepIndex + 1) / totalSteps) * 100);
 

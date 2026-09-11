@@ -482,7 +482,7 @@ export const TOOLS: ToolDefinition[] = [
         return {
           ok: true,
           data: { query: res.query, results: res.results },
-          summary: `Retrieved ${res.results.length} web sources for "${query}". Top source: ${res.results[0].title} (${res.results[0].domain}).`,
+          summary: `Retrieved ${res.results.length} web sources for "${query}". Top source: ${res.results[0]?.title ?? ""} (${res.results[0]?.domain ?? ""}).`,
         };
       } catch (err) {
         return {

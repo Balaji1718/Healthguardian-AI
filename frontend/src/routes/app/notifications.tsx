@@ -1,15 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Bell,
-  BellRing,
-  Check,
-  CheckCheck,
-  Filter,
-  Inbox,
-  Trash2,
-} from "lucide-react";
+import { Bell, BellRing, Check, CheckCheck, Clock, Filter, Inbox, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -81,15 +73,9 @@ export function NotificationsPage() {
     }
   };
 
-  const allItems = useMemo(
-    () => (data ?? []).filter((n) => n.status !== "dismissed"),
-    [data],
-  );
+  const allItems = useMemo(() => (data ?? []).filter((n) => n.status !== "dismissed"), [data]);
 
-  const unreadCount = useMemo(
-    () => allItems.filter((n) => n.status !== "read").length,
-    [allItems],
-  );
+  const unreadCount = useMemo(() => allItems.filter((n) => n.status !== "read").length, [allItems]);
 
   const filteredItems = useMemo(() => {
     if (filter === "unread") return allItems.filter((n) => n.status !== "read");
@@ -161,14 +147,12 @@ export function NotificationsPage() {
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {t("notifications.subtitle")}
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("notifications.subtitle")}</p>
         </div>
 
         <div className="flex items-center gap-1.5">
           <ContextualHelp content="Alerts are for awareness, not emergency monitoring. Notifications never expose private clinical details." />
-          
+
           {permission !== "granted" && (
             <Button
               variant="default"
@@ -210,9 +194,7 @@ export function NotificationsPage() {
             )}
           >
             <span>Unread</span>
-            {unreadCount > 0 && (
-              <span className="size-1.5 rounded-full bg-amber-400" />
-            )}
+            {unreadCount > 0 && <span className="size-1.5 rounded-full bg-amber-400" />}
           </button>
           <button
             type="button"
@@ -292,9 +274,7 @@ export function NotificationsPage() {
                 )}
               >
                 {/* Unread Accent Bar */}
-                {isUnread && (
-                  <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
-                )}
+                {isUnread && <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
 
                 <div className="flex items-start gap-3">
                   {/* Category / Priority Icon Badge */}
@@ -319,9 +299,7 @@ export function NotificationsPage() {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {isUnread && (
-                          <span className="size-2 rounded-full bg-primary shrink-0" />
-                        )}
+                        {isUnread && <span className="size-2 rounded-full bg-primary shrink-0" />}
                         <h2 className="text-xs font-semibold text-foreground truncate">
                           {formatNotificationTitle(n, t)}
                         </h2>

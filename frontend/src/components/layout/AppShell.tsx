@@ -63,12 +63,22 @@ export const NAV_SECTIONS = [
     defaultTitle: "Care & Settings",
     items: [
       { to: "/app/guide", key: "nav.guide", defaultLabel: "Help & Guide", icon: Compass },
-      { to: "/app/notifications", key: "nav.notifications", defaultLabel: "Notifications", icon: Bell },
+      {
+        to: "/app/notifications",
+        key: "nav.notifications",
+        defaultLabel: "Notifications",
+        icon: Bell,
+      },
       { to: "/app/support", key: "nav.support", defaultLabel: "Support", icon: LifeBuoy },
-      { to: "/app/settings", key: "nav.settings", defaultLabel: "Profile & Privacy", icon: Settings },
+      {
+        to: "/app/settings",
+        key: "nav.settings",
+        defaultLabel: "Profile & Privacy",
+        icon: Settings,
+      },
     ],
   },
-] as const;
+];
 
 export const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
 
@@ -93,8 +103,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       // 2. Listen for real-time foreground pushes while user is in the app
       unsubscribe = await listenForForegroundPush((payload) => {
-        const title = payload.notification?.title || payload.data?.title || "HealthGuardian AI";
-        const body = payload.notification?.body || payload.data?.body || "You have a new health alert.";
+        const title = payload.notification?.title || payload.data?.["title"] || "HealthGuardian AI";
+        const body =
+          payload.notification?.body || payload.data?.["body"] || "You have a new health alert.";
 
         // Audio & vibration alert
         void showBrowserNotification(title, body);
@@ -171,7 +182,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-[100dvh] bg-background">
       {/* Mobile-First Header Bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card/90 px-3.5 backdrop-blur sm:px-4 lg:pl-[17rem]">
-        <Link to="/app/dashboard" className="flex items-center gap-2 font-bold tracking-tight text-sm sm:text-base">
+        <Link
+          to="/app/dashboard"
+          className="flex items-center gap-2 font-bold tracking-tight text-sm sm:text-base"
+        >
           <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             <Heart className="size-4 text-primary fill-primary/20" />
           </div>
@@ -229,9 +243,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="text-xs font-semibold text-foreground truncate">
                 {user.displayName || user.email?.split("@")[0] || "User"}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {user.email || ""}
-              </p>
+              <p className="text-[11px] text-muted-foreground truncate">{user.email || ""}</p>
             </div>
             <Button
               variant="ghost"
@@ -341,7 +353,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setOpen((prev) => !prev)}
           className={cn(
             "flex flex-col items-center justify-center py-1 px-2.5 min-w-[56px] text-[10px] font-medium transition-colors touch-press cursor-pointer",
-            open || (path !== "/app/dashboard" && path !== "/app/reports" && path !== "/app/checkin" && path !== "/app/assistant")
+            open ||
+              (path !== "/app/dashboard" &&
+                path !== "/app/reports" &&
+                path !== "/app/checkin" &&
+                path !== "/app/assistant")
               ? "text-primary font-bold"
               : "text-muted-foreground hover:text-foreground",
           )}
@@ -370,7 +386,9 @@ export function PageHeader({
       <div>
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{title}</h1>
         {description && (
-          <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground leading-relaxed">{description}</p>
+          <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            {description}
+          </p>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

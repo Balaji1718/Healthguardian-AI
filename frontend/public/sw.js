@@ -40,7 +40,11 @@ self.addEventListener("push", (event) => {
     }
   }
   const title = data.notification?.title || data.data?.title || data.title || "HealthGuardian AI";
-  const body = data.notification?.body || data.data?.body || data.body || "You have a new health reminder or alert.";
+  const body =
+    data.notification?.body ||
+    data.data?.body ||
+    data.body ||
+    "You have a new health reminder or alert.";
   const clickUrl = data.data?.url || data.fcmOptions?.link || "/app/notifications";
   const origin = self.location.origin;
   const iconUrl = new URL("/pwa-192.png", origin).href;

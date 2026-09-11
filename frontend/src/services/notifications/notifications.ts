@@ -3,6 +3,7 @@ import {
   listNotifications,
   updateNotification,
 } from "@/services/firebase/repositories";
+import { getCurrentUserIdToken } from "@/services/firebase/auth";
 import type { AppNotification } from "@/models";
 import type { DetectedPattern } from "@/features/healthRisk/engine";
 
@@ -29,14 +30,15 @@ export async function requestNotificationPermission(): Promise<
   try {
     return await Notification.requestPermission();
   } catch {
-    return "denied";
+    return "unsupported";
   }
 }
 
-const APP_NOTIFICATION_ICON = "/pwa-192.png";
+const APP_NOTIFICATION_ICON = "/pwa-192x192.png";
 
 export async function showBrowserNotification(title: string, body: string): Promise<boolean> {
-  if (typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  if (typeof window === "undefined" || typeof Notification === "undefined") return false;
+  if (Notification.permission !== "granted") return false;
 
   // 1. Try Service Worker showNotification (works on mobile Chrome, Android PWA, modern mobile browsers)
   if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
@@ -47,6 +49,7 @@ export async function showBrowserNotification(title: string, body: string): Prom
           body,
           icon: APP_NOTIFICATION_ICON,
           badge: APP_NOTIFICATION_ICON,
+          // @ts-expect-error vibrate is supported in service worker notifications on mobile
           vibrate: [200, 100, 200],
           tag: "healthguardian-alert",
           data: { url: "/app/notifications" },
@@ -84,9 +87,13 @@ export async function dispatchServerPush(
   data: Record<string, string> = {},
 ): Promise<{ ok: boolean; delivered?: boolean; reason?: string }> {
   try {
+    const idToken = await getCurrentUserIdToken();
     const res = await fetch("/api/notifications/dispatch-push", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
       body: JSON.stringify({ uid, title, body, data }),
     });
     if (!res.ok) {
@@ -105,9 +112,13 @@ export async function scheduleServerTestPush(
   lang = "en",
 ): Promise<{ ok: boolean; message?: string }> {
   try {
+    const idToken = await getCurrentUserIdToken();
     const res = await fetch("/api/notifications/schedule-test-push", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
       body: JSON.stringify({ uid, delaySeconds, lang }),
     });
     if (!res.ok) return { ok: false, message: "Could not schedule server push." };
@@ -148,8 +159,9 @@ export async function sendTestNotification(uid: string, lang = "en"): Promise<bo
     hi: "इस डिवाइस पर सूचनाएं ठीक से काम कर रही हैं। உங்களுக்கு சுகாதார நினைவூட்டல்கள் இங்கே தோன்றும்.",
   };
 
-  const title = titles[lang] || titles.en;
-  const message = bodies[lang] || bodies.en;
+  const title = titles[lang] || titles["en"] || "HealthGuardian AI Notification Test";
+  const message =
+    bodies[lang] || bodies["en"] || "Notifications are working properly on this device.";
 
   // 1. Dispatch real server FCM push through Google push servers to registered device tokens
   const serverPush = await dispatchServerPush(uid, title, message, {

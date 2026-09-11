@@ -8,6 +8,8 @@ import { FirebaseSetupNotice } from "@/components/common/FirebaseSetupNotice";
 
 import { AppLoadingScreen } from "@/components/common/AppLoadingScreen";
 import { useTranslation } from "@/locales/i18n";
+import { listCheckins } from "@/services/firebase/repositories";
+import { syncAdaptiveNotifications } from "@/services/notifications/adaptive";
 
 export const Route = createFileRoute("/app")({
   // Firebase auth state lives in the browser; the protected shell is client-rendered.
@@ -38,6 +40,17 @@ function AppLayout() {
       void navigate({ to: "/auth", replace: true });
     }
   }, [loading, user, location.pathname, navigate]);
+
+  // Proactive background evaluation of adaptive notifications across the app workspace
+  useEffect(() => {
+    if (user?.uid) {
+      void listCheckins(user.uid, 30)
+        .then((checkins) => {
+          if (checkins.length) void syncAdaptiveNotifications(user.uid, checkins);
+        })
+        .catch(() => {});
+    }
+  }, [user?.uid]);
 
   if (!isFirebaseConfigured) return <FirebaseSetupNotice />;
   if (loading || !user) return <AppLoadingScreen />;

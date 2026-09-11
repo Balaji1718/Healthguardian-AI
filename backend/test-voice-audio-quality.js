@@ -11,7 +11,10 @@
  */
 
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let passCount = 0;
 let failCount = 0;
@@ -32,11 +35,11 @@ console.log("============================================================\n");
 
 // Read frontend voice files
 const voiceRecorderSrc = readFileSync(
-  resolve("frontend/src/features/checkin/VoiceRecorderWaveform.tsx"),
+  resolve(__dirname, "../frontend/src/features/checkin/VoiceRecorderWaveform.tsx"),
   "utf-8"
 );
 const useSpeechRecSrc = readFileSync(
-  resolve("frontend/src/features/checkin/useSpeechRecognition.ts"),
+  resolve(__dirname, "../frontend/src/features/checkin/useSpeechRecognition.ts"),
   "utf-8"
 );
 

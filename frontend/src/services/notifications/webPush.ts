@@ -1,6 +1,13 @@
-import { getMessaging, getToken, isSupported, onMessage, type MessagePayload } from "firebase/messaging";
+import {
+  getMessaging,
+  getToken,
+  isSupported,
+  onMessage,
+  type MessagePayload,
+} from "firebase/messaging";
 import { getFirebaseApp } from "@/services/firebase/config";
 import { saveDeviceToken } from "@/services/firebase/repositories";
+import { getCurrentUserIdToken } from "@/services/firebase/auth";
 
 const vapidKey =
   (import.meta.env["VITE_FIREBASE_VAPID_KEY"] as string | undefined) ||
@@ -39,9 +46,13 @@ export async function registerWebPush(uid: string): Promise<{
 
     // 2. Server-side Firebase Admin persistence (bypasses any client rule limits)
     try {
+      const idToken = await getCurrentUserIdToken();
       await fetch("/api/notifications/register-token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
         body: JSON.stringify({ uid, token }),
       });
     } catch (e) {

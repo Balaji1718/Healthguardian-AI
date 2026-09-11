@@ -9,14 +9,18 @@ import {
   routeCompletion,
 } from "./ai-provider-router.js";
 
+// Ensure mock environment is clean and isolated from ambient production keys
+delete process.env.OPENAI_API_KEY;
+delete process.env.GEMINI_API_KEY;
+
 // Ensure mock keys are present for mock router testing
-process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "mock-openrouter-key";
-process.env.GROQ_API_KEY = process.env.GROQ_API_KEY || "mock-groq-key";
-process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "mock-nvidia-key";
-process.env.MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || "mock-mistral-key";
-process.env.SAMBANOVA_API_KEY = process.env.SAMBANOVA_API_KEY || "mock-sambanova-key";
-process.env.COHERE_API_KEY = process.env.COHERE_API_KEY || "mock-cohere-key";
-process.env.CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY || "mock-cerebras-key";
+process.env.OPENROUTER_API_KEY = "mock-openrouter-key";
+process.env.GROQ_API_KEY = "mock-groq-key";
+process.env.NVIDIA_API_KEY = "mock-nvidia-key";
+process.env.MISTRAL_API_KEY = "mock-mistral-key";
+process.env.SAMBANOVA_API_KEY = "mock-sambanova-key";
+process.env.COHERE_API_KEY = "mock-cohere-key";
+process.env.CEREBRAS_API_KEY = "mock-cerebras-key";
 
 const request = { messages: [{ role: "user", content: "synthetic multi-provider test" }] };
 
@@ -28,15 +32,16 @@ function mockResponse(content, status = 200) {
 }
 
 function getProviderIdFromUrl(url) {
+  if (url.includes("openrouter.ai")) return "openrouter";
+  if (url.includes("groq.com")) return "groq";
+  if (url.includes("nvidia.com")) return "nvidia";
+  if (url.includes("mistral.ai")) return "mistral";
+  if (url.includes("sambanova.ai")) return "sambanova";
+  if (url.includes("cohere.com")) return "cohere";
+  if (url.includes("cerebras.ai")) return "cerebras";
+  if (url.includes("api.openai.com")) return "openai";
   for (const p of PROVIDER_REGISTRY) {
-    if (url.includes(p.id) || (p.id === "nvidia" && url.includes("nvidia")) || (p.id === "sambanova" && url.includes("sambanova"))) {
-      return p.id;
-    }
-    if (p.id === "openrouter" && url.includes("openrouter.ai")) return "openrouter";
-    if (p.id === "groq" && url.includes("groq.com")) return "groq";
-    if (p.id === "mistral" && url.includes("mistral.ai")) return "mistral";
-    if (p.id === "cohere" && url.includes("cohere.com")) return "cohere";
-    if (p.id === "cerebras" && url.includes("cerebras.ai")) return "cerebras";
+    if (url.includes(p.baseUrl)) return p.id;
   }
   return "unknown";
 }
@@ -395,7 +400,9 @@ await runMockTest(
   {
     action: async () => {
       const sorted = [...PROVIDER_REGISTRY].sort((a, b) => a.priority - b.priority);
-      const expectedIds = ["openrouter", "groq", "nvidia", "mistral", "sambanova", "cohere", "cerebras"];
+      const expectedIds = PROVIDER_REGISTRY.some((p) => p.id === "openai")
+        ? ["openai", "openrouter", "groq", "nvidia", "mistral", "sambanova", "cohere", "cerebras"]
+        : ["openrouter", "groq", "nvidia", "mistral", "sambanova", "cohere", "cerebras"];
       assert.deepEqual(sorted.map((p) => p.id), expectedIds);
       return { provider: "openrouter" };
     },

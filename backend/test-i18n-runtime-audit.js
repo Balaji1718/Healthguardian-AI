@@ -177,7 +177,6 @@ const sourceFilesToCheck = [
   "frontend/src/routes/app/reports.tsx",
   "frontend/src/routes/app/goals.tsx",
   "frontend/src/routes/app/notifications.tsx",
-  "frontend/src/routes/app/specialist.tsx",
   "frontend/src/routes/app/support.tsx",
   "frontend/src/routes/app/settings.tsx",
   "frontend/src/routes/app/guide.tsx",

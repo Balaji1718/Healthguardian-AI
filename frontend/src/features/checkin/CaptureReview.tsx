@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Edit3,
@@ -13,6 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   HelpCircle,
+  Activity,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,22 +29,25 @@ export interface CaptureReviewProps {
   date: string;
   data: Partial<DailyCheckin>;
   source: CheckinSource;
-  fieldConfidence?: Record<string, "high" | "medium" | "low">;
-  isAmbiguous?: boolean;
-  ambiguityReasons?: string[];
-  sourceDocument?: string;
-  sourcePage?: number;
-  inputUtterance?: string;
-  interpretation?: HealthInterpretationResult | null;
-  analysis?: {
-    enhancedSummary?: string | null;
-    conditionInsights?: string[];
-    riskPatterns?: string[];
-    historySuggestions?: string[];
-  } | null;
-  onEdit?: () => void;
+  fieldConfidence?: Record<string, "high" | "medium" | "low"> | undefined;
+  isAmbiguous?: boolean | undefined;
+  ambiguityReasons?: string[] | undefined;
+  sourceDocument?: string | undefined;
+  sourcePage?: number | undefined;
+  inputUtterance?: string | undefined;
+  interpretation?: HealthInterpretationResult | null | undefined;
+  analysis?:
+    | {
+        enhancedSummary?: string | null | undefined;
+        conditionInsights?: string[] | undefined;
+        riskPatterns?: string[] | undefined;
+        historySuggestions?: string[] | undefined;
+      }
+    | null
+    | undefined;
+  onEdit?: (() => void) | undefined;
   onConfirm: (includedData?: Partial<DailyCheckin>) => Promise<void>;
-  onUpdateField?: (field: string, value: string) => void;
+  onUpdateField?: ((field: string, value: string) => void) | undefined;
   busy: boolean;
 }
 
@@ -120,7 +126,8 @@ export function CaptureReview({
         initialVal = editedValues.waterGlasses != null ? String(editedValues.waterGlasses) : "";
         break;
       case "exerciseMinutes":
-        initialVal = editedValues.exerciseMinutes != null ? String(editedValues.exerciseMinutes) : "";
+        initialVal =
+          editedValues.exerciseMinutes != null ? String(editedValues.exerciseMinutes) : "";
         secondaryVal = editedValues.exerciseType || "";
         break;
       case "weightKg":
@@ -170,7 +177,10 @@ export function CaptureReview({
         const val = draftValue.trim();
         const num = val ? parseInt(val, 10) : null;
         updated.waterGlasses = num != null && !isNaN(num) ? num : null;
-        onUpdateField?.("waterGlasses", updated.waterGlasses != null ? String(updated.waterGlasses) : "");
+        onUpdateField?.(
+          "waterGlasses",
+          updated.waterGlasses != null ? String(updated.waterGlasses) : "",
+        );
         break;
       }
       case "exerciseMinutes": {
@@ -178,7 +188,10 @@ export function CaptureReview({
         const num = val ? parseInt(val, 10) : null;
         updated.exerciseMinutes = num != null && !isNaN(num) ? num : null;
         updated.exerciseType = draftSecondary.trim() || undefined;
-        onUpdateField?.("exerciseMinutes", updated.exerciseMinutes != null ? String(updated.exerciseMinutes) : "");
+        onUpdateField?.(
+          "exerciseMinutes",
+          updated.exerciseMinutes != null ? String(updated.exerciseMinutes) : "",
+        );
         onUpdateField?.("exerciseType", updated.exerciseType || "");
         break;
       }
@@ -195,7 +208,10 @@ export function CaptureReview({
         updated.systolicBP = sys != null && !isNaN(sys) ? sys : null;
         updated.diastolicBP = dia != null && !isNaN(dia) ? dia : null;
         onUpdateField?.("systolicBP", updated.systolicBP != null ? String(updated.systolicBP) : "");
-        onUpdateField?.("diastolicBP", updated.diastolicBP != null ? String(updated.diastolicBP) : "");
+        onUpdateField?.(
+          "diastolicBP",
+          updated.diastolicBP != null ? String(updated.diastolicBP) : "",
+        );
         break;
       }
       case "bloodGlucose": {
@@ -203,7 +219,10 @@ export function CaptureReview({
         const num = val ? parseFloat(val) : null;
         updated.bloodGlucose = num != null && !isNaN(num) ? num : null;
         updated.bloodGlucoseUnit = draftSecondary.trim() || "mg/dL";
-        onUpdateField?.("bloodGlucose", updated.bloodGlucose != null ? String(updated.bloodGlucose) : "");
+        onUpdateField?.(
+          "bloodGlucose",
+          updated.bloodGlucose != null ? String(updated.bloodGlucose) : "",
+        );
         onUpdateField?.("bloodGlucoseUnit", updated.bloodGlucoseUnit);
         break;
       }
@@ -224,7 +243,9 @@ export function CaptureReview({
     setEditingFieldId(null);
   };
 
-  const wellbeingObj = editedValues.wellbeing ? WELLBEING_LABELS[editedValues.wellbeing] : undefined;
+  const wellbeingObj = editedValues.wellbeing
+    ? WELLBEING_LABELS[editedValues.wellbeing]
+    : undefined;
 
   // Build field review items using local edited values
   const items = useMemo(
@@ -235,7 +256,7 @@ export function CaptureReview({
         value: date,
         hasValue: true,
         canExclude: false,
-        confidence: fieldConfidence.date || "high",
+        confidence: fieldConfidence["date"] || "high",
       },
       {
         id: "wellbeing",
@@ -247,7 +268,7 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: Boolean(editedValues.wellbeing),
         canExclude: true,
-        confidence: fieldConfidence.wellbeing || "high",
+        confidence: fieldConfidence["wellbeing"] || "high",
       },
       {
         id: "sleepHours",
@@ -258,7 +279,7 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: editedValues.sleepHours != null,
         canExclude: true,
-        confidence: fieldConfidence.sleepHours || "high",
+        confidence: fieldConfidence["sleepHours"] || "high",
       },
       {
         id: "waterGlasses",
@@ -269,7 +290,7 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: editedValues.waterGlasses != null,
         canExclude: true,
-        confidence: fieldConfidence.waterGlasses || "high",
+        confidence: fieldConfidence["waterGlasses"] || "high",
       },
       {
         id: "exerciseMinutes",
@@ -280,16 +301,18 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: editedValues.exerciseMinutes != null,
         canExclude: true,
-        confidence: fieldConfidence.exerciseMinutes || "high",
+        confidence: fieldConfidence["exerciseMinutes"] || "high",
       },
       {
         id: "weightKg",
         label: t("dashboard.weight"),
         value:
-          editedValues.weightKg != null ? `${editedValues.weightKg} ${t("units.kg")}` : t("dashboard.notLogged"),
+          editedValues.weightKg != null
+            ? `${editedValues.weightKg} ${t("units.kg")}`
+            : t("dashboard.notLogged"),
         hasValue: editedValues.weightKg != null,
         canExclude: true,
-        confidence: fieldConfidence.weightKg || "high",
+        confidence: fieldConfidence["weightKg"] || "high",
       },
       {
         id: "bloodPressure",
@@ -300,7 +323,7 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: editedValues.systolicBP != null && editedValues.diastolicBP != null,
         canExclude: true,
-        confidence: fieldConfidence.systolicBP || "high",
+        confidence: fieldConfidence["systolicBP"] || "high",
       },
       {
         id: "bloodGlucose",
@@ -311,7 +334,7 @@ export function CaptureReview({
             : t("dashboard.notLogged"),
         hasValue: editedValues.bloodGlucose != null,
         canExclude: true,
-        confidence: fieldConfidence.bloodGlucose || "high",
+        confidence: fieldConfidence["bloodGlucose"] || "high",
       },
     ],
     [date, editedValues, wellbeingObj, fieldConfidence, t],
@@ -323,22 +346,26 @@ export function CaptureReview({
   // Compute final payload with only user-included fields
   const handleConfirmAction = async () => {
     const finalPayload: Partial<DailyCheckin> = {
-      date,
-      wellbeing: includedFields.wellbeing ? (editedValues.wellbeing ?? null) : null,
-      sleepHours: includedFields.sleepHours ? (editedValues.sleepHours ?? null) : null,
-      waterGlasses: includedFields.waterGlasses ? (editedValues.waterGlasses ?? null) : null,
-      exerciseMinutes: includedFields.exerciseMinutes ? (editedValues.exerciseMinutes ?? null) : null,
-      exerciseType: includedFields.exerciseMinutes ? (editedValues.exerciseType ?? null) : null,
-      foodQuality: editedValues.foodQuality ?? null,
-      weightKg: includedFields.weightKg ? (editedValues.weightKg ?? null) : null,
-      systolicBP: includedFields.bloodPressure ? (editedValues.systolicBP ?? null) : null,
-      diastolicBP: includedFields.bloodPressure ? (editedValues.diastolicBP ?? null) : null,
-      bloodGlucose: includedFields.bloodGlucose ? (editedValues.bloodGlucose ?? null) : null,
+      date: date ? new Date(date) : null,
+      wellbeing: includedFields["wellbeing"] ? editedValues.wellbeing || undefined : undefined,
+      sleepHours: includedFields["sleepHours"] ? (editedValues.sleepHours ?? null) : null,
+      waterGlasses: includedFields["waterGlasses"] ? (editedValues.waterGlasses ?? null) : null,
+      exerciseMinutes: includedFields["exerciseMinutes"]
+        ? (editedValues.exerciseMinutes ?? null)
+        : null,
+      exerciseType: includedFields["exerciseMinutes"]
+        ? editedValues.exerciseType || undefined
+        : undefined,
+      foodQuality: editedValues.foodQuality || undefined,
+      weightKg: includedFields["weightKg"] ? (editedValues.weightKg ?? null) : null,
+      systolicBP: includedFields["bloodPressure"] ? (editedValues.systolicBP ?? null) : null,
+      diastolicBP: includedFields["bloodPressure"] ? (editedValues.diastolicBP ?? null) : null,
+      bloodGlucose: includedFields["bloodGlucose"] ? (editedValues.bloodGlucose ?? null) : null,
       bloodGlucoseUnit: editedValues.bloodGlucoseUnit ?? "mg/dL",
-      symptoms: includedFields.symptoms ? (editedValues.symptoms ?? []) : [],
-      tags: includedFields.tags ? (editedValues.tags ?? []) : [],
-      notes: includedFields.notes ? (editedValues.notes ?? null) : null,
-      observations: includedFields.observations ? (editedValues.observations ?? []) : [],
+      symptoms: includedFields["symptoms"] ? (editedValues.symptoms ?? []) : [],
+      tags: includedFields["tags"] ? (editedValues.tags ?? []) : [],
+      notes: includedFields["notes"] ? editedValues.notes || undefined : undefined,
+      observations: includedFields["observations"] ? (editedValues.observations ?? []) : [],
     };
 
     await onConfirm(finalPayload);
@@ -515,7 +542,7 @@ export function CaptureReview({
           <span className="text-[11px] text-muted-foreground font-medium">{item.label}</span>
           <div className="flex items-center gap-1">
             {item.hasValue && isIncluded && getConfidenceBadge(item.confidence)}
-            
+
             {/* In-place edit button */}
             {item.canExclude && (
               <button
@@ -538,11 +565,7 @@ export function CaptureReview({
                 title={isIncluded ? t("review.excludeField") : t("review.includeField")}
                 aria-label={`${isIncluded ? "Exclude" : "Include"} ${item.label}`}
               >
-                {isIncluded ? (
-                  <Check className="size-4 text-primary" />
-                ) : (
-                  <X className="size-4" />
-                )}
+                {isIncluded ? <Check className="size-4 text-primary" /> : <X className="size-4" />}
               </button>
             )}
           </div>
@@ -605,6 +628,55 @@ export function CaptureReview({
         </div>
       )}
 
+      {/* 0. Intent-Driven Adaptive Action Banner */}
+      {interpretation?.mainIntent && interpretation.mainIntent !== "daily_checkin" && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+              <Sparkles className="size-4 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground capitalize">
+                  {interpretation.mainIntent.replace(/_/g, " ")} Detected
+                </span>
+                <Badge
+                  variant="outline"
+                  className="text-[9px] px-1.5 py-0 border-primary/30 text-primary"
+                >
+                  Adaptive
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                {interpretation.mainIntent === "symptom_concern"
+                  ? "You reported health symptoms. You can consult the AI Assistant for lifestyle and preventive guidance."
+                  : interpretation.mainIntent === "habit_goal"
+                    ? "You mentioned a target or habit. You can track this in your Goals workspace."
+                    : "Key preventive insights were identified from your check-in."}
+              </p>
+            </div>
+          </div>
+          {interpretation.mainIntent === "symptom_concern" && (
+            <Link
+              to="/app/assistant"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 self-start sm:self-auto shadow-xs"
+            >
+              <span>Consult Assistant</span>
+              <ArrowRight className="size-3" />
+            </Link>
+          )}
+          {interpretation.mainIntent === "habit_goal" && (
+            <Link
+              to="/app/goals"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 self-start sm:self-auto shadow-xs"
+            >
+              <span>View Goals</span>
+              <ArrowRight className="size-3" />
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* 1. Understood Health Priorities (Major Points) */}
       {interpretation?.majorPoints && interpretation.majorPoints.length > 0 && (
         <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 text-xs space-y-2.5 shadow-xs">
@@ -613,14 +685,20 @@ export function CaptureReview({
               <Sparkles className="size-4 text-primary" />
               <span>Understood Health Priorities</span>
             </div>
-            <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/10">
+            <Badge
+              variant="outline"
+              className="text-[10px] text-primary border-primary/30 bg-primary/10"
+            >
               Major Points
             </Badge>
           </div>
 
           <div className="space-y-1.5 pt-0.5">
             {interpretation.majorPoints.map((point, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-foreground font-medium text-xs leading-relaxed">
+              <div
+                key={idx}
+                className="flex items-start gap-2 text-foreground font-medium text-xs leading-relaxed"
+              >
                 <span className="text-primary mt-0.5 font-bold">•</span>
                 <span>{point}</span>
               </div>
@@ -631,7 +709,9 @@ export function CaptureReview({
             <div className="pt-2 border-t border-primary/15 text-muted-foreground text-[11px] space-y-0.5">
               <span className="font-semibold text-foreground/80 block">Secondary Context:</span>
               {interpretation.secondaryDetails.map((sec, idx) => (
-                <p key={idx} className="italic pl-2">{sec}</p>
+                <p key={idx} className="italic pl-2">
+                  {sec}
+                </p>
               ))}
             </div>
           )}
@@ -646,10 +726,76 @@ export function CaptureReview({
             <span>Suggested Continuity Context</span>
           </div>
           {interpretation.missingInformation.map((missing, idx) => (
-            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-muted-foreground pt-1">
+            <div
+              key={idx}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-muted-foreground pt-1"
+            >
               <p className="leading-relaxed">{missing.prompt}</p>
+              {missing.field && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdditionalMetrics(true);
+                    startEditField(missing.field);
+                  }}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors self-start sm:self-auto shrink-0 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded cursor-pointer"
+                >
+                  <Plus className="size-2.5" />
+                  <span>Log {missing.field}</span>
+                </button>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 2b. Adaptive Clinical Analysis & Observations */}
+      {analysis && (
+        <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold text-foreground text-xs">
+              <Activity className="size-3.5 text-primary" />
+              <span>Adaptive Analysis & Observations</span>
+            </div>
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              Clinical Context
+            </Badge>
+          </div>
+          {analysis.enhancedSummary && (
+            <p className="text-muted-foreground text-[11px] leading-relaxed italic bg-muted/30 p-2 rounded-lg">
+              "{analysis.enhancedSummary}"
+            </p>
+          )}
+          {analysis.conditionInsights && analysis.conditionInsights.length > 0 && (
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                Condition Insights
+              </span>
+              <ul className="space-y-0.5 pl-2 text-[11px] text-foreground/90">
+                {analysis.conditionInsights.map((ins, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-primary font-bold">•</span>
+                    <span>{ins}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analysis.historySuggestions && analysis.historySuggestions.length > 0 && (
+            <div className="space-y-1 pt-1.5 border-t border-border/40">
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider block">
+                Recommended Next Steps
+              </span>
+              <ul className="space-y-0.5 pl-2 text-[11px] text-foreground/90">
+                {analysis.historySuggestions.map((sug, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-emerald-500 font-bold">•</span>
+                    <span>{sug}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -659,9 +805,7 @@ export function CaptureReview({
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider text-[11px]">
             Explicit Stated Metrics
           </span>
-          <span className="text-[10px] text-muted-foreground">
-            {loggedItems.length} active
-          </span>
+          <span className="text-[10px] text-muted-foreground">{loggedItems.length} active</span>
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -707,10 +851,10 @@ export function CaptureReview({
               onClick={() => toggleField("tags")}
               className="text-[11px] text-primary hover:underline"
             >
-              {includedFields.tags ? "Exclude" : "Include"}
+              {includedFields["tags"] ? "Exclude" : "Include"}
             </button>
           </div>
-          {includedFields.tags && (
+          {includedFields["tags"] && (
             <div className="flex flex-wrap gap-1.5">
               {data.tags.map((tag, i) => (
                 <Badge key={i} variant="secondary" className="text-xs font-medium px-2 py-0.5">
@@ -734,12 +878,12 @@ export function CaptureReview({
               onClick={() => toggleField("symptoms")}
               className="text-[11px] text-primary hover:underline"
             >
-              {includedFields.symptoms
+              {includedFields["symptoms"]
                 ? t("review.exclude") || "Exclude"
                 : t("review.include") || "Include"}
             </button>
           </div>
-          {includedFields.symptoms && (
+          {includedFields["symptoms"] && (
             <div className="flex flex-wrap gap-1.5">
               {data.symptoms.map((sym, i) => (
                 <Badge
@@ -764,10 +908,10 @@ export function CaptureReview({
               onClick={() => toggleField("observations")}
               className="text-[11px] text-primary hover:underline"
             >
-              {includedFields.observations ? "Exclude" : "Include"}
+              {includedFields["observations"] ? "Exclude" : "Include"}
             </button>
           </div>
-          {includedFields.observations && (
+          {includedFields["observations"] && (
             <ul className="space-y-1 text-muted-foreground">
               {data.observations.map((observation, index) => (
                 <li key={`${observation.label}-${index}`}>
@@ -803,7 +947,7 @@ export function CaptureReview({
                 onClick={() => toggleField("notes")}
                 className="text-[11px] text-primary hover:underline ml-1"
               >
-                {includedFields.notes
+                {includedFields["notes"]
                   ? t("review.excludeField") || "Exclude"
                   : t("review.includeField") || "Include"}
               </button>
@@ -837,7 +981,7 @@ export function CaptureReview({
               </div>
             </div>
           ) : (
-            includedFields.notes && (
+            includedFields["notes"] && (
               <p className="text-muted-foreground leading-relaxed italic">{editedValues.notes}</p>
             )
           )}
@@ -845,14 +989,18 @@ export function CaptureReview({
       )}
 
       {/* 4. Contextual Health Analysis & Inferences (Separated Provenance) */}
-      {((interpretation?.inferredContext && interpretation.inferredContext.length > 0) || (analysis?.conditionInsights && analysis.conditionInsights.length > 0)) && (
+      {((interpretation?.inferredContext && interpretation.inferredContext.length > 0) ||
+        (analysis?.conditionInsights && analysis.conditionInsights.length > 0)) && (
         <div className="space-y-2.5 rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs animate-in fade-in">
           <div className="flex items-center justify-between border-b border-primary/10 pb-2">
             <div className="flex items-center gap-1.5 text-primary font-semibold">
               <Sparkles className="size-4" />
               <span>AI Health Analysis & Contextual Inferences</span>
             </div>
-            <Badge variant="outline" className="text-[9px] text-muted-foreground border-muted-foreground/30">
+            <Badge
+              variant="outline"
+              className="text-[9px] text-muted-foreground border-muted-foreground/30"
+            >
               Unconfirmed Inferences
             </Badge>
           </div>
@@ -865,7 +1013,10 @@ export function CaptureReview({
               </span>
               <div className="space-y-1">
                 {interpretation.inferredContext.map((inf, idx) => (
-                  <div key={idx} className="p-2 rounded-lg bg-card/60 border border-border/40 text-[11px] space-y-0.5">
+                  <div
+                    key={idx}
+                    className="p-2 rounded-lg bg-card/60 border border-border/40 text-[11px] space-y-0.5"
+                  >
                     <span className="font-medium text-foreground block">{inf.topic}</span>
                     <p className="text-muted-foreground leading-relaxed">{inf.inference}</p>
                   </div>
@@ -881,7 +1032,9 @@ export function CaptureReview({
               </span>
               <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.conditionInsights.map((insight, idx) => (
-                  <li key={idx} className="leading-relaxed">{insight}</li>
+                  <li key={idx} className="leading-relaxed">
+                    {insight}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -894,7 +1047,9 @@ export function CaptureReview({
               </span>
               <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.riskPatterns.map((pattern, idx) => (
-                  <li key={idx} className="leading-relaxed">{pattern}</li>
+                  <li key={idx} className="leading-relaxed">
+                    {pattern}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -907,7 +1062,9 @@ export function CaptureReview({
               </span>
               <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground text-[11px]">
                 {analysis.historySuggestions.map((sug, idx) => (
-                  <li key={idx} className="leading-relaxed">{sug}</li>
+                  <li key={idx} className="leading-relaxed">
+                    {sug}
+                  </li>
                 ))}
               </ul>
             </div>

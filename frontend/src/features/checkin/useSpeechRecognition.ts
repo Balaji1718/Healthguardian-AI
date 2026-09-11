@@ -132,7 +132,10 @@ export function normalizeSpeechTranscript(rawText: string, preferredLanguage = "
   } else {
     result = result
       .replace(/\biniku\b|\bindru\b|இன்று/gi, "Today")
-      .replace(/\bmani\s*neram\s*thoonginen\b|\bhours\s*thoonginen\b|மணி\s*நேரம்\s*தூங்கினேன்/gi, "hours of sleep")
+      .replace(
+        /\bmani\s*neram\s*thoonginen\b|\bhours\s*thoonginen\b|மணி\s*நேரம்\s*தூங்கினேன்/gi,
+        "hours of sleep",
+      )
       .replace(/\bthoonginen\b|\bthoongina\b|தூங்கினேன்/gi, "slept")
       .replace(/\bthookam\b|தூக்கம்/gi, "sleep")
       .replace(/\bthanni\b|\bthanneer\b|தண்ணீர்/gi, "water")

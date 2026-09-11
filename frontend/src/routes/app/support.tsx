@@ -111,11 +111,11 @@ export function SupportPage() {
           <Mail className="size-5" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-foreground text-sm">
-            Direct Support & Feedback Desk
-          </p>
+          <p className="font-semibold text-foreground text-sm">Direct Support & Feedback Desk</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Have questions, encounter a bug, or want to suggest an improvement? Submit your ticket below. All messages and requests are securely recorded and reviewed directly by our engineering and product team.
+            Have questions, encounter a bug, or want to suggest an improvement? Submit your ticket
+            below. All messages and requests are securely recorded and reviewed directly by our
+            engineering and product team.
           </p>
         </div>
       </div>

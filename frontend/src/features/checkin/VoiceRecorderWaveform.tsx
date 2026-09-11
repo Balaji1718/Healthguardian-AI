@@ -74,7 +74,9 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
   // Register development diagnostics
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as unknown as { __HEALTHGUARDIAN_VOICE_DIAGNOSTICS__: Record<string, unknown> }).__HEALTHGUARDIAN_VOICE_DIAGNOSTICS__ = {
+      (
+        window as unknown as { __HEALTHGUARDIAN_VOICE_DIAGNOSTICS__: Record<string, unknown> }
+      ).__HEALTHGUARDIAN_VOICE_DIAGNOSTICS__ = {
         activePipeline: "WebSpeechAPI",
         singleAuthoritativeStream: true,
         hardwareEchoSuppression: true,

@@ -108,7 +108,9 @@ function Dashboard() {
       await qc.invalidateQueries({ queryKey: ["analysis", uid] });
       await qc.invalidateQueries({ queryKey: ["goals", uid] });
       await refetch();
-      toast.success(t("dashboard.sampleLoaded") || "Sample health profile loaded! Explore your dashboard.");
+      toast.success(
+        t("dashboard.sampleLoaded") || "Sample health profile loaded! Explore your dashboard.",
+      );
     } catch (e) {
       toast.error("Failed to load sample data. Please try again.");
     } finally {
@@ -124,7 +126,9 @@ function Dashboard() {
       await qc.invalidateQueries({ queryKey: ["analysis", uid] });
       await qc.invalidateQueries({ queryKey: ["goals", uid] });
       await refetch();
-      toast.success(t("dashboard.sampleCleared") || "Sample data cleared. Ready for your personal records!");
+      toast.success(
+        t("dashboard.sampleCleared") || "Sample data cleared. Ready for your personal records!",
+      );
     } catch (e) {
       toast.error("Failed to clear sample data. Please try again.");
     } finally {
@@ -345,7 +349,8 @@ function Dashboard() {
                   <span>{t("dashboard.previewScore")}</span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  A calculated 0–100 wellness metric reflecting sleep consistency, hydration, exercise, and vitals.
+                  A calculated 0–100 wellness metric reflecting sleep consistency, hydration,
+                  exercise, and vitals.
                 </p>
               </div>
               <div className="surface p-4 rounded-xl space-y-2">
@@ -354,7 +359,8 @@ function Dashboard() {
                   <span>{t("dashboard.previewPatterns")}</span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  Automatic local pattern detection alerts you to rising BP trends or chronic sleep debt early.
+                  Automatic local pattern detection alerts you to rising BP trends or chronic sleep
+                  debt early.
                 </p>
               </div>
               <div className="surface p-4 rounded-xl space-y-2">
@@ -363,7 +369,8 @@ function Dashboard() {
                   <span>{t("dashboard.previewVitals")}</span>
                 </div>
                 <p className="text-muted-foreground leading-relaxed">
-                  7-day and 30-day visual historical charts so you can see trends over time and share with your doctor.
+                  7-day and 30-day visual historical charts so you can see trends over time and
+                  share with your doctor.
                 </p>
               </div>
             </div>
@@ -383,7 +390,11 @@ function Dashboard() {
                   Log your sleep, water, and vitals in 60s
                 </p>
               </div>
-              <Button asChild size="sm" className="shrink-0 gap-1.5 shadow-sm touch-press font-semibold text-xs px-3.5">
+              <Button
+                asChild
+                size="sm"
+                className="shrink-0 gap-1.5 shadow-sm touch-press font-semibold text-xs px-3.5"
+              >
                 <Link to="/app/checkin">
                   <Mic className="size-3.5" />
                   <span>{t("dashboard.logNow")}</span>
@@ -396,7 +407,10 @@ function Dashboard() {
                 <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>Today's check-in recorded!</span>
               </span>
-              <Link to="/app/checkin" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline touch-press">
+              <Link
+                to="/app/checkin"
+                className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline touch-press"
+              >
                 {t("dashboard.updateToday")} →
               </Link>
             </div>
@@ -413,16 +427,22 @@ function Dashboard() {
               </Badge>
             </div>
             <div className="mt-2 flex items-baseline gap-3">
-              <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground">{score.score}</p>
+              <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground">
+                {score.score}
+              </p>
               <span className="text-xs text-muted-foreground font-medium">/ 100</span>
             </div>
             <Progress value={score.score} className="mt-3 h-2.5" />
-            <p className="mt-2.5 text-[11px] text-muted-foreground leading-relaxed">{t("dashboard.scoreDisclaimer")}</p>
+            <p className="mt-2.5 text-[11px] text-muted-foreground leading-relaxed">
+              {t("dashboard.scoreDisclaimer")}
+            </p>
             <ul className="mt-3.5 space-y-1.5 text-xs">
               {score.contributions.slice(0, 3).map((c, i) => (
                 <li key={i} className="flex items-start justify-between gap-3">
                   <span className="text-muted-foreground">{formatScoreContribution(c, t)}</span>
-                  <span className={`font-semibold ${c.delta < 0 ? "text-destructive" : "text-success"}`}>
+                  <span
+                    className={`font-semibold ${c.delta < 0 ? "text-destructive" : "text-success"}`}
+                  >
                     {c.delta > 0 ? `+${c.delta}` : c.delta}
                   </span>
                 </li>
@@ -454,7 +474,9 @@ function Dashboard() {
                   <p className="text-lg font-bold text-foreground">
                     {last?.sleepHours != null ? `${last.sleepHours} h` : "—"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.sleep")}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">
+                    {t("dashboard.sleep")}
+                  </p>
                 </div>
               </div>
 
@@ -470,7 +492,9 @@ function Dashboard() {
                   <p className="text-lg font-bold text-foreground">
                     {last?.waterGlasses != null ? `${last.waterGlasses} gl` : "—"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.water")}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">
+                    {t("dashboard.water")}
+                  </p>
                 </div>
               </div>
 
@@ -486,7 +510,9 @@ function Dashboard() {
                   <p className="text-lg font-bold text-foreground">
                     {last?.exerciseMinutes != null ? `${last.exerciseMinutes} m` : "—"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground font-medium">{t("dashboard.exercise")}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">
+                    {t("dashboard.exercise")}
+                  </p>
                 </div>
               </div>
 
@@ -496,11 +522,15 @@ function Dashboard() {
                   <div className="size-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
                     <Heart className="size-4" />
                   </div>
-                  <span className="text-[10px] text-muted-foreground font-medium">Target &lt;120</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    Target &lt;120
+                  </span>
                 </div>
                 <div>
                   <p className="text-lg font-bold text-foreground">
-                    {last?.systolicBP != null ? `${last.systolicBP}/${last.diastolicBP || 80}` : "—"}
+                    {last?.systolicBP != null
+                      ? `${last.systolicBP}/${last.diastolicBP || 80}`
+                      : "—"}
                   </p>
                   <p className="text-[11px] text-muted-foreground font-medium">Blood Pressure</p>
                 </div>
@@ -516,7 +546,10 @@ function Dashboard() {
                 <h2 className="flex items-center gap-1.5 text-xs font-bold text-foreground uppercase tracking-wider">
                   <Activity className="size-3.5 text-primary" /> {t("dashboard.patternsDetected")}
                 </h2>
-                <Link to="/app/risk" className="text-xs text-primary font-medium hover:underline touch-press">
+                <Link
+                  to="/app/risk"
+                  className="text-xs text-primary font-medium hover:underline touch-press"
+                >
                   {t("dashboard.viewAll")}
                 </Link>
               </div>
@@ -561,7 +594,10 @@ function Dashboard() {
                 <h2 className="flex items-center gap-1.5 text-xs font-bold text-foreground uppercase tracking-wider">
                   <Target className="size-3.5 text-primary" /> {t("dashboard.activeGoals")}
                 </h2>
-                <Link to="/app/goals" className="text-xs text-primary font-medium hover:underline touch-press">
+                <Link
+                  to="/app/goals"
+                  className="text-xs text-primary font-medium hover:underline touch-press"
+                >
                   {t("dashboard.manageGoals")} →
                 </Link>
               </div>
@@ -573,7 +609,10 @@ function Dashboard() {
                     .filter((g) => g.status === "active")
                     .slice(0, 3)
                     .map((g) => (
-                      <li key={g.id} className="space-y-1.5 p-2.5 rounded-xl bg-card border border-border/70 shadow-2xs">
+                      <li
+                        key={g.id}
+                        className="space-y-1.5 p-2.5 rounded-xl bg-card border border-border/70 shadow-2xs"
+                      >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs font-semibold truncate text-foreground flex-1 min-w-0">
                             {formatGoalTitle(g.title, t)}
@@ -602,7 +641,9 @@ function Dashboard() {
                         <Progress
                           className="h-1.5"
                           value={
-                            g.targetValue ? Math.min(100, (g.progressValue / g.targetValue) * 100) : 0
+                            g.targetValue
+                              ? Math.min(100, (g.progressValue / g.targetValue) * 100)
+                              : 0
                           }
                         />
                       </li>

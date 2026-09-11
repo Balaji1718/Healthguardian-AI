@@ -321,7 +321,7 @@ export function extractWithRules(text, targetLang = "en") {
   if (dosaMatch) foodItems.push(`${dosaMatch[1] || ""} dosa`.trim());
   const idliMatch = norm.match(/(\d+)?\s*(?:idli|idly|இட்லி)/i);
   if (idliMatch) foodItems.push(`${idliMatch[1] || ""} idli`.trim());
-  if (/(?:kaafi|kaapi|coffee|காபி|कॉफी)/i.test(norm)) foodItems.push("Coffee");
+  if (/(?:kaafi|kaapi|coffee|காபி|कॉफी)/i.test(norm)) foodItems.push("Coffee / Beverage");
   if (/(?:tea|டீ|chai|चाय)/i.test(norm)) foodItems.push("Tea");
   if (/(?:tender coconut|elani|ilani|இளநீர்)/i.test(norm)) foodItems.push("Tender Coconut");
   if (foodItems.length > 0) {
