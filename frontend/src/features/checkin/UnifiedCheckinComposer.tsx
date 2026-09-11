@@ -29,6 +29,7 @@ import { useTranslation } from "@/locales/i18n";
 
 interface UnifiedCheckinComposerProps {
   onTextSubmit: (text: string) => void;
+  onEnhanceSubmit?: (text: string) => void;
   onVoiceTranscriptReady: (transcript: string, language: string) => void;
   onFileSelect: (file: File) => void;
   onOpenDetailed?: () => void;
@@ -57,6 +58,7 @@ const LOCALIZED_PLACEHOLDERS: Record<string, string[]> = {
 
 export function UnifiedCheckinComposer({
   onTextSubmit,
+  onEnhanceSubmit,
   onVoiceTranscriptReady,
   onFileSelect,
   onOpenDetailed,
@@ -250,6 +252,36 @@ export function UnifiedCheckinComposer({
             >
               <Mic className="size-4" />
             </Button>
+
+            {/* Enhance & Analyze AI Action Button */}
+            {inputText.trim() ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  const clean = inputText.trim();
+                  if (!clean || extracting) return;
+                  if (onEnhanceSubmit) {
+                    onEnhanceSubmit(clean);
+                  } else {
+                    onTextSubmit(clean);
+                  }
+                }}
+                disabled={extracting}
+                variant="secondary"
+                size="sm"
+                className="h-9 px-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 border border-primary/25 font-medium text-xs flex items-center gap-1.5 shrink-0 transition-all shadow-xs"
+                title="AI Enhance: Calculate intervals, analyze health patterns, and monitor risks"
+                aria-label="AI Enhance & Analyze"
+              >
+                {extracting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3.5 text-primary" />
+                )}
+                <span className="hidden sm:inline">Enhance & Analyze</span>
+                <span className="sm:hidden">Enhance</span>
+              </Button>
+            ) : null}
 
             {/* Submit / Extract Button */}
             <Button

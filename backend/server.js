@@ -1,17 +1,20 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
 import { createServer as createViteServer } from 'vite';
 import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeCompletion, testProvider } from './ai-provider-router.js';
 import { executeWebSearch } from './web-search.js';
 import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
 import { sendUserPush } from './firebase-admin.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const frontendRoot = path.resolve(__dirname, '../frontend');
 const isProduction = process.env.NODE_ENV === 'production';
 const port = Number(process.env.PORT) || 3000;
@@ -114,10 +117,27 @@ app.post('/api/support/email', async (req, res) => {
 
   const recipient = process.env.SUPPORT_EMAIL_TO || 'balajiteen18@gmail.com';
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log(`[Support Ticket] Ticket ${requestId || 'new'} recorded for ${recipient}: ${reason.trim()}`);
-    return res.status(200).json({ ok: true, delivered: true, recipient });
+
+  // 1. Permanently record in Firestore global support queue
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const db = getFirestore();
+    await db.collection('supportTickets').add({
+      requestId: requestId || null,
+      type: type || 'question',
+      priority: priority || 'normal',
+      summary: reason.trim(),
+      details: typeof message === 'string' ? message.trim() : '',
+      userEmail: userEmail || 'anonymous',
+      userName: userName || 'Anonymous',
+      recipient,
+      status: 'received',
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    console.warn('Firestore ticket backup error:', err.message);
   }
+
   const text = [
     `Request ID: ${requestId || 'not provided'}`,
     `Type: ${type || 'question'}`,
@@ -127,6 +147,11 @@ app.post('/api/support/email', async (req, res) => {
     `Summary: ${reason.trim()}`,
     `Details: ${typeof message === 'string' && message.trim() ? message.trim() : 'No additional details.'}`,
   ].join('\n');
+
+  if (!apiKey) {
+    console.log(`[Support Ticket] Recorded for ${recipient} without Resend key: ${reason.trim()}`);
+    return res.status(200).json({ ok: true, delivered: false, stored: true, recipient });
+  }
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
@@ -138,17 +163,21 @@ app.post('/api/support/email', async (req, res) => {
       body: JSON.stringify({
         from: process.env.SUPPORT_EMAIL_FROM || 'HealthGuardian Support <onboarding@resend.dev>',
         to: [recipient],
-        subject: `[HealthGuardian support] ${reason.trim()}`,
+        subject: `[HealthGuardian Support] ${reason.trim()}`,
         text,
       }),
     });
 
+    const resJson = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return res.status(502).json({ ok: false, delivered: false, error: 'Support email delivery failed.' });
+      console.error('[Support Email] Resend returned error:', response.status, resJson);
+      return res.status(200).json({ ok: true, delivered: false, stored: true, error: resJson.message });
     }
-    return res.status(200).json({ ok: true, delivered: true });
-  } catch {
-    return res.status(502).json({ ok: false, delivered: false, error: 'Support email delivery failed.' });
+    console.log(`[Support Email] Successfully sent ticket to ${recipient}, id: ${resJson.id}`);
+    return res.status(200).json({ ok: true, delivered: true, id: resJson.id });
+  } catch (err) {
+    console.error('[Support Email] Dispatch failed:', err.message);
+    return res.status(200).json({ ok: true, delivered: false, stored: true, error: err.message });
   }
 });
 

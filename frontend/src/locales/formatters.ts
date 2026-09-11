@@ -403,8 +403,6 @@ export function formatGuideButton(
       return t("nav.goals");
     case "/app/notifications":
       return t("nav.notifications");
-    case "/app/specialist":
-      return t("nav.specialist");
     case "/app/support":
       return t("nav.support");
     case "/app/settings":

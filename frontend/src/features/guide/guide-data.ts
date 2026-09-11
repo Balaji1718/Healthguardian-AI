@@ -74,8 +74,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "6. Goals: Create a realistic health target (e.g. 8 glasses of water)",
       "7. Notifications: Review contextual reminders and alerts",
       "8. AI Assistant: Ask questions like 'How has my sleep changed?'",
-      "9. Specialist Guidance: Review relevant medical specialties if patterns arise",
-      "10. Support: Contact support whenever you have app or account questions",
+      "9. Support: Contact support whenever you have app or account questions",
     ],
     beginnerExplanation:
       "You don't need to do everything at once! Start simply by completing your profile and logging today's check-in. In just 3 days, HealthGuardian will start unlocking personal insights tailored specifically to you.",
@@ -295,26 +294,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     buttonLabel: "Open Notifications",
   },
   {
-    id: "specialist-guidance",
-    number: 14,
-    title: "Specialist Guidance",
-    subtitle: "Suggested discussion topics for your doctor",
-    category: "core_features",
-    summary:
-      "Specialist Guidance identifies which medical specialty may be relevant to discuss persistent lifestyle patterns or elevated vitals with.",
-    keyPoints: [
-      "Advisory Suggestions: Suggests categories such as Cardiology, Sleep Medicine, or Endocrinology",
-      "Discussion Basis: Explains why a specialty might be relevant based on your logged patterns",
-      "Not a Referral or Diagnosis: Does not book appointments or diagnose clinical illnesses",
-    ],
-    beginnerExplanation:
-      "If your blood pressure is repeatedly high or your sleep has been disrupted for weeks, this page suggests which type of doctor you might mention it to during your next checkup.",
-    routeToOpen: "/app/specialist",
-    buttonLabel: "Open Specialist Guidance",
-  },
-  {
     id: "support",
-    number: 15,
+    number: 14,
     title: "Application Support & Helpdesk",
     subtitle: "Getting assistance with your account and data",
     category: "privacy_safety",
@@ -476,17 +457,6 @@ export const GUIDED_TOUR_STEPS: GuidedTourStep[] = [
   },
   {
     stepNumber: 10,
-    title: "Specialist Guidance",
-    sectionId: "specialist-guidance",
-    targetRoute: "/app/specialist",
-    targetLabel: "Specialist Guidance",
-    description:
-      "Find out which clinical specialties (e.g. Cardiology, Sleep Specialist) may be relevant to discuss recurring patterns with.",
-    actionPrompt: "Discover suggested physician categories for your doctor visits.",
-    keyTakeaway: "Guidance is advisory to facilitate informed conversations with your doctor.",
-  },
-  {
-    stepNumber: 11,
     title: "Helpdesk & Support",
     sectionId: "support",
     targetRoute: "/app/support",
@@ -497,7 +467,7 @@ export const GUIDED_TOUR_STEPS: GuidedTourStep[] = [
     keyTakeaway: "Application support is for technical inquiries, never medical emergencies.",
   },
   {
-    stepNumber: 12,
+    stepNumber: 11,
     title: "Help & Guide Center",
     sectionId: "getting-started",
     targetRoute: "/app/guide",

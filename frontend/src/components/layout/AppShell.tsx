@@ -15,7 +15,6 @@ import {
   LogOut,
   Menu,
   Settings,
-  Stethoscope,
   Target,
   WifiOff,
   X,
@@ -63,12 +62,6 @@ export const NAV_SECTIONS = [
     titleKey: "nav.sectionSystem",
     defaultTitle: "Care & Settings",
     items: [
-      {
-        to: "/app/specialist",
-        key: "nav.specialist",
-        defaultLabel: "Specialist Guidance",
-        icon: Stethoscope,
-      },
       { to: "/app/guide", key: "nav.guide", defaultLabel: "Help & Guide", icon: Compass },
       { to: "/app/notifications", key: "nav.notifications", defaultLabel: "Notifications", icon: Bell },
       { to: "/app/support", key: "nav.support", defaultLabel: "Support", icon: LifeBuoy },

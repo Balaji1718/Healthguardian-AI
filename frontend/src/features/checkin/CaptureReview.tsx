@@ -26,6 +26,12 @@ export interface CaptureReviewProps {
   sourceDocument?: string;
   sourcePage?: number;
   inputUtterance?: string;
+  analysis?: {
+    enhancedSummary?: string | null;
+    conditionInsights?: string[];
+    riskPatterns?: string[];
+    historySuggestions?: string[];
+  } | null;
   onEdit: () => void;
   onConfirm: (includedData?: Partial<DailyCheckin>) => Promise<void>;
   busy: boolean;
@@ -49,6 +55,7 @@ export function CaptureReview({
   sourceDocument,
   sourcePage,
   inputUtterance,
+  analysis,
   onEdit,
   onConfirm,
   busy,
@@ -422,6 +429,55 @@ export function CaptureReview({
           </div>
           {includedFields.notes && (
             <p className="text-muted-foreground leading-relaxed italic">{data.notes}</p>
+          )}
+        </div>
+      )}
+
+      {/* AI Health Analysis, Risk Patterns & Body Condition Insights */}
+      {analysis && (
+        <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs animate-in fade-in">
+          <div className="flex items-center gap-1.5 text-primary font-semibold">
+            <Sparkles className="size-4" />
+            <span>AI Health Analysis & Risk Insights</span>
+          </div>
+
+          {analysis.conditionInsights && analysis.conditionInsights.length > 0 && (
+            <div className="space-y-1">
+              <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider block">
+                Condition & Recovery
+              </span>
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+                {analysis.conditionInsights.map((insight, idx) => (
+                  <li key={idx} className="leading-relaxed">{insight}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {analysis.riskPatterns && analysis.riskPatterns.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <span className="text-[11px] font-semibold text-amber-500 uppercase tracking-wider block">
+                Risk Pattern Observations
+              </span>
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+                {analysis.riskPatterns.map((pattern, idx) => (
+                  <li key={idx} className="leading-relaxed">{pattern}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {analysis.historySuggestions && analysis.historySuggestions.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider block">
+                Health History Suggestions
+              </span>
+              <ul className="space-y-1 pl-3.5 list-disc text-muted-foreground">
+                {analysis.historySuggestions.map((sug, idx) => (
+                  <li key={idx} className="leading-relaxed">{sug}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

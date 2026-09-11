@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, LifeBuoy, Mail, ExternalLink } from "lucide-react";
+import { Loader2, LifeBuoy, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, ErrorState, LoadingState } from "@/components/common/States";
@@ -93,7 +93,7 @@ export function SupportPage() {
       }
       await qc.invalidateQueries({ queryKey: ["support"] });
       setForm({ type: "question", reason: "", message: "", priority: "normal" });
-      toast.success("Support ticket sent directly to balajiteen18@gmail.com.");
+      toast.success("Support ticket submitted successfully. Our team will review your request.");
     } catch {
       toast.error(t("common.error"));
     } finally {
@@ -101,43 +101,23 @@ export function SupportPage() {
     }
   };
 
-  const directMailtoUrl = `mailto:balajiteen18@gmail.com?subject=${encodeURIComponent(
-    `[HealthGuardian AI] ${form.reason || "Feedback / Support Request"}`,
-  )}&body=${encodeURIComponent(
-    `Category: ${form.type}\nPriority: ${form.priority}\nUser: ${
-      getFirebaseAuth().currentUser?.email || "User"
-    }\n\nMessage:\n${form.message || ""}`,
-  )}`;
-
   return (
     <div className="space-y-4 max-w-3xl mx-auto pb-12">
       <PageHeader title={t("support.title")} description={t("support.subtitle")} />
 
-      {/* Recipient & Transparency Banner */}
-      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-start gap-3">
-          <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
-            <Mail className="size-5" />
-          </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-foreground text-sm">
-              Direct Support & Feedback Desk
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Have questions, encounter a bug, or want to suggest an improvement? All messages and tickets are received and reviewed directly by the project lead at{" "}
-              <strong className="text-foreground font-semibold">balajiteen18@gmail.com</strong>.
-            </p>
-          </div>
+      {/* Direct Support & Feedback Desk Banner */}
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 flex items-start gap-3 shadow-xs">
+        <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+          <Mail className="size-5" />
         </div>
-
-        <a
-          href={directMailtoUrl}
-          className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-primary/30 bg-card hover:bg-primary/10 text-primary text-xs font-semibold transition-colors touch-press shadow-2xs"
-        >
-          <Mail className="size-3.5" />
-          <span>Email directly</span>
-          <ExternalLink className="size-3 opacity-60" />
-        </a>
+        <div className="space-y-1">
+          <p className="font-semibold text-foreground text-sm">
+            Direct Support & Feedback Desk
+          </p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Have questions, encounter a bug, or want to suggest an improvement? Submit your ticket below. All messages and requests are securely recorded and reviewed directly by our engineering and product team.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={submit} className="surface grid gap-4 p-6 sm:grid-cols-2">

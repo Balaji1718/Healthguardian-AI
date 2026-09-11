@@ -23,7 +23,6 @@ import { Route as AppNotificationsRouteImport } from './routes/app/notifications
 import { Route as AppReportsRouteImport } from './routes/app/reports'
 import { Route as AppRiskRouteImport } from './routes/app/risk'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
-import { Route as AppSpecialistRouteImport } from './routes/app/specialist'
 import { Route as AppSupportRouteImport } from './routes/app/support'
 
 const IndexRoute = IndexRouteImport.update({
@@ -96,11 +95,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
-const AppSpecialistRoute = AppSpecialistRouteImport.update({
-  id: '/specialist',
-  path: '/specialist',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSupportRoute = AppSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -121,7 +115,6 @@ export interface FileRoutesByFullPath {
   '/app/reports': typeof AppReportsRoute
   '/app/risk': typeof AppRiskRoute
   '/app/settings': typeof AppSettingsRoute
-  '/app/specialist': typeof AppSpecialistRoute
   '/app/support': typeof AppSupportRoute
   '/app/': typeof AppIndexRoute
 }
@@ -138,7 +131,6 @@ export interface FileRoutesByTo {
   '/app/reports': typeof AppReportsRoute
   '/app/risk': typeof AppRiskRoute
   '/app/settings': typeof AppSettingsRoute
-  '/app/specialist': typeof AppSpecialistRoute
   '/app/support': typeof AppSupportRoute
   '/app': typeof AppIndexRoute
 }
@@ -157,7 +149,6 @@ export interface FileRoutesById {
   '/app/reports': typeof AppReportsRoute
   '/app/risk': typeof AppRiskRoute
   '/app/settings': typeof AppSettingsRoute
-  '/app/specialist': typeof AppSpecialistRoute
   '/app/support': typeof AppSupportRoute
   '/app/': typeof AppIndexRoute
 }
@@ -177,7 +168,6 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/risk'
     | '/app/settings'
-    | '/app/specialist'
     | '/app/support'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
@@ -194,7 +184,6 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/risk'
     | '/app/settings'
-    | '/app/specialist'
     | '/app/support'
     | '/app'
   id:
@@ -212,7 +201,6 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/risk'
     | '/app/settings'
-    | '/app/specialist'
     | '/app/support'
     | '/app/'
   fileRoutesById: FileRoutesById
@@ -323,13 +311,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/specialist': {
-      id: '/app/specialist'
-      path: '/specialist'
-      fullPath: '/app/specialist'
-      preLoaderRoute: typeof AppSpecialistRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/app/support': {
       id: '/app/support'
       path: '/support'
@@ -351,7 +332,6 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppRiskRoute: typeof AppRiskRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppSpecialistRoute: typeof AppSpecialistRoute
   AppSupportRoute: typeof AppSupportRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -367,7 +347,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppRiskRoute: AppRiskRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppSpecialistRoute: AppSpecialistRoute,
   AppSupportRoute: AppSupportRoute,
   AppIndexRoute: AppIndexRoute,
 }
@@ -382,11 +361,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

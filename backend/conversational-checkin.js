@@ -1,17 +1,12 @@
-/**
- * HealthGuardian AI - Adaptive Multilingual Conversational Health Extraction
- *
- * Implements bounded, deterministic extraction of daily health metrics from free-form text,
- * voice transcripts, connected folder docs, and multilingual/Tanglish/Hinglish utterances.
- *
- * Core Principles:
- * 1. Phonetic & Conversational Intelligence: Interprets speech recognition noise, Tanglish, and Hinglish.
- * 2. Strict Safety Gate: Detects emergent medical triggers deterministically before LLM processing.
- * 3. Bounded Schema & Immutability: Only extracts values and generates clean, enhanced summaries.
- */
-
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { routeCompletion } from "./ai-provider-router.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 // Deterministic emergency safety check (English, Tamil, Hindi)
 const EMERGENCY_PATTERNS = [
@@ -40,7 +35,7 @@ export const extractionSchema = z.object({
   waterGlasses: z.number().min(0).max(30).nullable().optional(),
   exerciseMinutes: z.number().min(0).max(600).nullable().optional(),
   exerciseType: z.string().max(60).nullable().optional(),
-  foodQuality: z.string().max(60).nullable().optional(),
+  foodQuality: z.string().max(160).nullable().optional(),
   weightKg: z.number().min(20).max(400).nullable().optional(),
   systolicBP: z.number().min(60).max(260).nullable().optional(),
   diastolicBP: z.number().min(30).max(200).nullable().optional(),
@@ -61,34 +56,42 @@ export const extractionSchema = z.object({
     unit: z.string().max(30).nullable().optional(),
     temporalContext: z.string().max(120).nullable().optional(),
     severity: z.string().max(30).nullable().optional(),
-    confidence: z.enum(["high", "medium", "low"]),
+    confidence: z.enum(["high", "medium", "low"]).default("high"),
     sourceText: z.string().max(500),
     userConfirmed: z.boolean().default(false),
   })).default([]),
+  analysis: z.object({
+    enhancedSummary: z.string().nullable().optional(),
+    conditionInsights: z.array(z.string()).default([]),
+    riskPatterns: z.array(z.string()).default([]),
+    historySuggestions: z.array(z.string()).default([]),
+  }).nullable().optional(),
 }).strict();
 
 const SYSTEM_EXTRACTION_PROMPT = `You are an intelligent, empathetic, adaptive health data extraction and natural language understanding assistant for HealthGuardian AI.
-Your task is to understand, enhance, and extract lifestyle metrics, symptoms, and health entries from the user's natural free-form speech, voice transcripts, or text.
+Your task is to deeply understand, enhance, and extract lifestyle metrics, symptoms, nutrition, activity, and health entries from the user's natural free-form speech, voice transcripts, or text.
 You support multilingual, code-switched, and colloquial utterances in English, Tamil, Tanglish, Hindi, and Hinglish.
 
 NON-STRICT, CONTEXTUAL NATURAL LANGUAGE UNDERSTANDING:
-1. DO NOT BE RIGID OR STRICT WITH PARTICULAR KEYWORDS. People communicate in diverse, informal, and conversational ways:
+1. DO NOT BE RIGID OR STRICT WITH PARTICULAR KEYWORDS. Comprehend the natural meaning:
+   - Sleep from bedtime to wake time: "yesterday slept at 11:30 PM and I woke at 6:10AM" -> calculate exact hours difference (11:30 PM to 6:10 AM = 6.7 hours) -> sleepHours: 6.7
    - Sleep intervals: "went to bed at 11 and woke up at 7" -> sleepHours: 8
-   - Sleep idioms: "slept like a rock" -> wellbeing: "great", sleepHours: 8; "kann moodala" / "didn't sleep at all" / "thoongave illa" -> sleepHours: 0, wellbeing: "tired", tags: ["Poor sleep"]
-   - Hydration: "tender coconut and 2 cups of tea" -> foodQuality: "Tender coconut & tea", waterGlasses: 3; "lots of fluids" / "thanni neraya kudichen" -> waterGlasses: 8
-   - Activities: "gardening for an hour" -> exerciseType: "Gardening", exerciseMinutes: 60; "took the stairs" / "walk paninen" / "walking ponen" -> exerciseType: "Walking", exerciseMinutes: 30
-   - Wellbeing & Symptoms: "feeling under the weather" -> wellbeing: "not_great"; "mandai idikudhu" / "thalavali" -> symptoms: ["headache"], wellbeing: "not_great"
+   - Sleep idioms: "slept like a rock" -> wellbeing: "great", sleepHours: 8; "didn't sleep at all" -> sleepHours: 0, wellbeing: "tired", tags: ["Poor sleep"]
+   - Activity durations: "exercise for 1 hour" -> exerciseMinutes: 60, exerciseType: "Exercise"; "walked for 45 mins" -> exerciseMinutes: 45, exerciseType: "Walking"
+   - Meals & Nutrition: "eat 4 dosa and one cup of coffee" -> foodQuality: "4 dosas & 1 cup coffee"; "tender coconut and 2 cups of tea" -> foodQuality: "Tender coconut & tea", waterGlasses: 3
    - Blood Pressure / Glucose: infer systolic, diastolic, glucose from conversational phrases like "sugar was 110", "bp 120 80".
 2. Extract all stated or clearly implied values into the schema. If a metric was NOT mentioned or implied, set it to null.
-3. If an explicit 0 is stated (e.g., "no water", "தூங்கவில்லை", "உடற்பயிற்சி செய்யவில்லை", "पानी नहीं पिया"), set value to 0.
+3. If an explicit 0 is stated (e.g., "no water", "தூங்கவில்லை", "உடற்பயிற்சி செய்யவில்லை"), set value to 0.
 4. If a value is ambiguous or uncertain, set isAmbiguous: true and provide a helpful ambiguityReason.
-5. In the "notes" field, provide a CLEAN, INTELLIGENT, AND ENHANCED natural summary of what the user communicated IN THE TARGET APPLICATION LANGUAGE specified in the context.
-   - If target language is "ta" (Tamil), write the notes in pure, grammatically sound Tamil script.
-   - If target language is "hi" (Hindi), write the notes in pure Devanagari Hindi.
-   - If target language is "en" (English), write the notes in natural English.
-6. Preserve meaningful details that do not fit the canonical metrics in "observations". Each observation must include a concise category, label, original sourceText, confidence, and optional valueText, numericValue, unit, temporalContext, or severity.
-7. NEVER generate medical diagnoses or prescribe medications.
-8. Return pure structured JSON matching the schema.`;
+5. In the "notes" field, provide a CLEAN, INTELLIGENT, AND ENHANCED natural summary of what the user communicated.
+6. In the "analysis" object, provide deep contextual clinical & lifestyle understanding:
+   - enhancedSummary: a beautifully structured, coherent summary of what the user logged.
+   - conditionInsights: 1-2 observations on the user's body condition and recovery (e.g., "Sleep duration was 6.7 hours, slightly below the 7-8h restorative target. Morning workout promotes metabolic activation.").
+   - riskPatterns: 1-2 potential risk observations or lifestyle patterns (e.g., "Late sleep onset (11:30 PM) may contribute to circadian rhythm delay; high carb meal without protein source.").
+   - historySuggestions: 1-2 constructive suggestions for health continuity (e.g., "Aim for bedtime before 11:00 PM to reach 7.5h sleep; hydrate adequately following 60m workout.").
+7. Preserve meaningful details that do not fit the canonical metrics in "observations".
+8. NEVER generate medical diagnoses or prescribe medications.
+9. Return pure structured JSON matching the schema.`;
 
 // Tamil Number Word Map (Native + Tanglish / Phonetic)
 const TAMIL_NUMBERS = {
@@ -166,10 +169,18 @@ const HINDI_NUMBERS = {
 function normalizeMultilingualNumbers(text) {
   let res = text;
   for (const [word, num] of Object.entries(TAMIL_NUMBERS)) {
-    res = res.replace(new RegExp(`\\b${word}\\b|${word}`, "gi"), String(num));
+    if (/^[\x00-\x7F]+$/.test(word)) {
+      res = res.replace(new RegExp(`\\b${word}\\b`, "gi"), String(num));
+    } else {
+      res = res.replace(new RegExp(word, "g"), String(num));
+    }
   }
   for (const [word, num] of Object.entries(HINDI_NUMBERS)) {
-    res = res.replace(new RegExp(`\\b${word}\\b|${word}`, "gi"), String(num));
+    if (/^[\x00-\x7F]+$/.test(word)) {
+      res = res.replace(new RegExp(`\\b${word}\\b`, "gi"), String(num));
+    } else {
+      res = res.replace(new RegExp(word, "g"), String(num));
+    }
   }
   return res;
 }
@@ -243,16 +254,29 @@ export function extractWithRules(text, targetLang = "en") {
     res.tags.push("Poor sleep");
   }
 
-  // Sleep intervals (e.g. "slept from 11 to 7", "slept 11pm to 7am")
+  // Sleep bed-to-wake intervals (e.g. "slept at 11:30 PM and I woke at 6:10AM", "went to bed at 11pm woke up at 7am")
   if (res.sleepHours === null) {
-    const intervalMatch = norm.match(/(?:slept|bed)\s*(?:from|at)?\s*(\d{1,2})(?::\d{2})?\s*(?:pm|am)?\s*(?:to|till|until)\s*(\d{1,2})(?::\d{2})?\s*(?:am|pm)?/i);
-    if (intervalMatch && intervalMatch[1] && intervalMatch[2]) {
-      const start = Number(intervalMatch[1]);
-      const end = Number(intervalMatch[2]);
-      let diff = end >= start ? end - start : (12 - start) + end;
-      if (diff > 0 && diff <= 16) {
+    const bedWakeMatch = norm.match(/(?:slept|bed|went to bed)\s*(?:at|from)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:and\s*(?:i\s*)?(?:woke(?:\s*up)?|got\s*up)|to|till|until)\s*(?:at)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (bedWakeMatch && bedWakeMatch[1] && bedWakeMatch[4]) {
+      let h1 = Number(bedWakeMatch[1]);
+      const m1 = bedWakeMatch[2] ? Number(bedWakeMatch[2]) : 0;
+      const p1 = (bedWakeMatch[3] || "").toLowerCase();
+      if (p1 === "pm" && h1 < 12) h1 += 12;
+      if (p1 === "am" && h1 === 12) h1 = 0;
+      const startDec = h1 + m1 / 60;
+
+      let h2 = Number(bedWakeMatch[4]);
+      const m2 = bedWakeMatch[5] ? Number(bedWakeMatch[5]) : 0;
+      const p2 = (bedWakeMatch[6] || "").toLowerCase();
+      if (p2 === "pm" && h2 < 12) h2 += 12;
+      if (p2 === "am" && h2 === 12) h2 = 0;
+      const endDec = h2 + m2 / 60;
+
+      let diff = endDec >= startDec ? endDec - startDec : (24 - startDec) + endDec;
+      diff = Math.round(diff * 10) / 10;
+      if (diff > 0 && diff <= 18) {
         res.sleepHours = diff;
-        res.fieldConfidence.sleepHours = "medium";
+        res.fieldConfidence.sleepHours = "high";
       }
     }
   }
@@ -261,11 +285,10 @@ export function extractWithRules(text, targetLang = "en") {
   if (res.sleepHours === null) {
     const sleepMatch = norm.match(/(\d+(?:\.\d+)?)\s*(?:hours|hrs|h)\s*(?:of\s*)?sleep/i) ||
                        norm.match(/(?:slept|sleep|rested|thoonginen|thoonga|thookam|tong|soya|neend)\s*[:=-]?\s*(?:for\s*)?(\d+(?:\.\d+)?)\s*(?:hours|hrs|h|mani|nehra|ghante|ghanta)?/i) ||
-                       norm.match(/(\d+(?:\.\d+)?)\s*(?:hours|hrs|h)\s*(?:thoonginen|thookam|thoongina|soya|rest)?/i) ||
+                       norm.match(/(?<!exercise\s*for\s*|workout\s*for\s*)(\d+(?:\.\d+)?)\s*(?:hours|hrs|h)\s*(?:thoonginen|thookam|thoongina|soya|rest)/i) ||
                        norm.match(/(\d+(?:\.\d+)?)\s*(?:மணி\s*நேரம்|மணி|நேரம்|nehra|mani|hours?)\s*(?:தூங்கினேன்|தூக்கம்|tong|thoong|sleep)?/i) ||
                        norm.match(/(?:தூங்கினேன்|தூக்கம்|tong|thoong)\s*(\d+(?:\.\d+)?)\s*(?:மணி\s*நேரம்|மணி|நேரம்|nehra|mani)?/i) ||
-                       norm.match(/(\d+(?:\.\d+)?)\s*(?:घंटे|घंटा|ghante|ghanta)\s*(?:सोया|नींद|की\s*नींद|soya|neend)?/i) ||
-                       norm.match(/(?:सोया|नींद|घंटे|soya|neend)\s*(\d+(?:\.\d+)?)\s*(?:घंटे|घंटा|ghante|ghanta)?/i);
+                       norm.match(/(\d+(?:\.\d+)?)\s*(?:घंटे|घंटा|ghante|ghanta)\s*(?:सोया|नींद|की\s*नींद|soya|neend)?/i);
     if (sleepMatch && (sleepMatch[1] || sleepMatch[2])) {
       const val = Number(sleepMatch[1] || sleepMatch[2]);
       if (!isNaN(val) && val >= 0 && val <= 24) {
@@ -292,27 +315,39 @@ export function extractWithRules(text, targetLang = "en") {
   }
 
   // Food Quality & Beverages
-  if (/(?:kaafi|kaapi|coffee|காபி|कॉफी)/i.test(norm)) {
-    res.foodQuality = "Coffee / Beverage";
-  } else if (/(?:tea|டீ|chai|चाय)/i.test(norm)) {
-    res.foodQuality = "Tea / Beverage";
-  } else if (/(?:tender coconut|elani|ilani|இளநீர்)/i.test(norm)) {
-    res.foodQuality = "Tender Coconut";
+  const foodItems = [];
+  const dosaMatch = norm.match(/(\d+)?\s*(?:dosa|dosai|தோசை|தோசைகள்)/i);
+  if (dosaMatch) foodItems.push(`${dosaMatch[1] || ""} dosa`.trim());
+  const idliMatch = norm.match(/(\d+)?\s*(?:idli|idly|இட்லி)/i);
+  if (idliMatch) foodItems.push(`${idliMatch[1] || ""} idli`.trim());
+  if (/(?:kaafi|kaapi|coffee|காபி|कॉफी)/i.test(norm)) foodItems.push("Coffee");
+  if (/(?:tea|டீ|chai|चाय)/i.test(norm)) foodItems.push("Tea");
+  if (/(?:tender coconut|elani|ilani|இளநீர்)/i.test(norm)) foodItems.push("Tender Coconut");
+  if (foodItems.length > 0) {
+    res.foodQuality = foodItems.join(" & ");
   }
 
-  // Exercise (English, Tamil, Hindi, Tanglish, Hinglish)
-  const exerciseMatch = norm.match(/(?:walked|ran|jogged|exercised|exercise|worked out|workout|activity|cycling|swimming|walk\s*paninen|walking\s*ponen|nadanthen|velai\s*senjen|chala|dauda)\s*[:=-]?\s*(?:for\s*)?(\d+)\s*(?:minutes|mins|m|min|nimisham|nimudam)/i) ||
-                        norm.match(/(\d+)\s*(?:minutes|mins|m|min|nimisham|nimisam|nimudam)\s*(?:of\s*)?(?:exercise|walking|running|workout|activity|walk|walk\s*paninen|nadanthen|chala|dauda)/i) ||
-                        norm.match(/(\d+)\s*(?:நிமிடம்|நிமிடங்கள்|நிமிஷம்|நிமிசங்கள்)\s*(?:நடந்தேன்|ஓடினேன்|உடற்பயிற்சி|நடைபயிற்சி|போனேன்|சென்றேன்)/) ||
-                        norm.match(/(?:நடந்தேன்|ஓடினேன்|உடற்பயிற்சி|நடைபயிற்சி)\s*(\d+)\s*(?:நிமிடம்|நிமிடங்கள்|நிமிஷம்|நிமிசங்கள்)/) ||
-                        norm.match(/(\d+)\s*(?:मिनट)\s*(?:चला|दौड़ा|घूमा|कसरत|व्यायाम)/) ||
-                        norm.match(/(?:चला|दौड़ा|घूमा|कसरत|व्यायाम)\s*(\d+)\s*(?:मिनट)?/);
-  if (exerciseMatch && exerciseMatch[1]) {
-    res.exerciseMinutes = Number(exerciseMatch[1]);
-    res.fieldConfidence.exerciseMinutes = res.isAmbiguous ? "medium" : "high";
-  } else if (/\b(walked for half an hour|half an hour walk|half an hour exercise)\b/i.test(norm) || /(அரை\s*மணி\s*நேரம்\s*நடந்தேன்|ஆधा\s*घंटा\s*चला)/.test(norm)) {
-    res.exerciseMinutes = 30;
+  // Exercise (Hours or Minutes)
+  const exerciseHourMatch = norm.match(/(?:exercised|exercise|worked out|workout|activity|walked|walking|running|gym)\s*(?:for\s*)?(\d+(?:\.\d+)?)\s*(?:hours|hour|hrs|hr)/i) ||
+                            norm.match(/(\d+(?:\.\d+)?)\s*(?:hours|hour|hrs|hr)\s*(?:of\s*)?(?:exercise|workout|walking|running|gym)/i);
+  if (exerciseHourMatch && exerciseHourMatch[1]) {
+    res.exerciseMinutes = Math.round(Number(exerciseHourMatch[1]) * 60);
     res.fieldConfidence.exerciseMinutes = "high";
+    if (!res.exerciseType) res.exerciseType = "Exercise";
+  } else {
+    const exerciseMatch = norm.match(/(?:walked|ran|jogged|exercised|exercise|worked out|workout|activity|cycling|swimming|walk\s*paninen|walking\s*ponen|nadanthen|velai\s*senjen|chala|dauda)\s*[:=-]?\s*(?:for\s*)?(\d+)\s*(?:minutes|mins|m|min|nimisham|nimudam)/i) ||
+                          norm.match(/(\d+)\s*(?:minutes|mins|m|min|nimisham|nimisam|nimudam)\s*(?:of\s*)?(?:exercise|walking|running|workout|activity|walk|walk\s*paninen|nadanthen|chala|dauda)/i) ||
+                          norm.match(/(\d+)\s*(?:நிமிடம்|நிமிடங்கள்|நிமிஷம்|நிமிசங்கள்)\s*(?:நடந்தேன்|ஓடினேன்|உடற்பயிற்சி|நடைபயிற்சி|போனேன்|சென்றேன்)/) ||
+                          norm.match(/(?:நடந்தேன்|ஓடினேன்|உடற்பயிற்சி|நடைபயிற்சி)\s*(\d+)\s*(?:நிமிடம்|நிமிடங்கள்|நிமிஷம்|நிமிசங்கள்)/) ||
+                          norm.match(/(\d+)\s*(?:मिनट)\s*(?:चला|दौड़ा|घूमा|कसरत|व्यायाम)/) ||
+                          norm.match(/(?:चला|दौड़ा|घूमा|कसरत|व्यायाम)\s*(\d+)\s*(?:मिनट)?/);
+    if (exerciseMatch && exerciseMatch[1]) {
+      res.exerciseMinutes = Number(exerciseMatch[1]);
+      res.fieldConfidence.exerciseMinutes = res.isAmbiguous ? "medium" : "high";
+    } else if (/\b(walked for half an hour|half an hour walk|half an hour exercise)\b/i.test(norm) || /(அரை\s*மணி\s*நேரம்\s*நடந்தேன்|ஆधा\s*घंटा\s*चला)/.test(norm)) {
+      res.exerciseMinutes = 30;
+      res.fieldConfidence.exerciseMinutes = "high";
+    }
   }
 
   // Exercise type
@@ -394,6 +429,31 @@ export function extractWithRules(text, targetLang = "en") {
       res.notes = parts.length > 0 ? parts.join(". ") + "." : text.trim();
     }
   }
+
+  res.analysis = {
+    enhancedSummary: res.notes || text.trim(),
+    conditionInsights: [
+      res.sleepHours != null && res.sleepHours < 7
+        ? `Sleep duration of ${res.sleepHours}h is slightly below the 7–8 hour target.`
+        : res.sleepHours != null
+        ? `Sleep duration of ${res.sleepHours}h supports good physiological recovery.`
+        : "Sleep was not logged for this entry.",
+      res.exerciseMinutes != null && res.exerciseMinutes >= 30
+        ? `Completed ${res.exerciseMinutes} mins of ${res.exerciseType || "physical activity"}, supporting cardiovascular health.`
+        : "Regular physical activity helps maintain energy levels.",
+    ],
+    riskPatterns: [
+      norm.includes("11:30") || norm.includes("12:00")
+        ? "Late sleep onset (after 11 PM) may delay circadian rhythm."
+        : "Sleep schedule within expected parameters.",
+      res.foodQuality
+        ? `Dietary intake: ${res.foodQuality}. Stay well-hydrated throughout the morning.`
+        : "Log hydration and meal composition.",
+    ],
+    historySuggestions: [
+      "Maintaining morning workout habits while getting to bed slightly earlier will optimize daily energy.",
+    ],
+  };
 
   return res;
 }

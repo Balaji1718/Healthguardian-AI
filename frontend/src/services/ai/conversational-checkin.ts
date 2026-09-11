@@ -19,7 +19,7 @@ export const extractedCheckinSchema = z
     waterGlasses: z.number().min(0).max(30).nullable().optional(),
     exerciseMinutes: z.number().min(0).max(600).nullable().optional(),
     exerciseType: z.string().max(60).nullable().optional(),
-    foodQuality: z.string().max(60).nullable().optional(),
+    foodQuality: z.string().max(160).nullable().optional(),
     weightKg: z.number().min(20).max(400).nullable().optional(),
     systolicBP: z.number().min(60).max(260).nullable().optional(),
     diastolicBP: z.number().min(30).max(200).nullable().optional(),
@@ -37,6 +37,15 @@ export const extractedCheckinSchema = z
     isAmbiguous: z.boolean().default(false),
     ambiguityReason: z.string().nullable().optional(),
     observations: z.array(healthObservationSchema).default([]),
+    analysis: z
+      .object({
+        enhancedSummary: z.string().nullable().optional(),
+        conditionInsights: z.array(z.string()).default([]),
+        riskPatterns: z.array(z.string()).default([]),
+        historySuggestions: z.array(z.string()).default([]),
+      })
+      .nullable()
+      .optional(),
   })
   .strict();
 

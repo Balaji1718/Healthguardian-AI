@@ -16,7 +16,10 @@ import { checkinIdForDate, getCheckin, saveCheckin } from "@/services/firebase/r
 import { useUid } from "@/features/auth/useAuth";
 import { useAppStore } from "@/store/app";
 import { CaptureReview } from "@/features/checkin/CaptureReview";
-import { extractCheckinFromText } from "@/services/ai/conversational-checkin";
+import {
+  extractCheckinFromText,
+  type CheckinExtractionResult,
+} from "@/services/ai/conversational-checkin";
 import { UnifiedCheckinComposer } from "@/features/checkin/UnifiedCheckinComposer";
 import { ConnectedFolderPanel } from "@/features/checkin/ConnectedFolderPanel";
 import { runOcr } from "@/services/ocr/ocr";
@@ -87,6 +90,7 @@ function Checkin() {
   >({});
   const [ambiguityReasonsList, setAmbiguityReasonsList] = useState<string[]>([]);
   const [rawInputUtterance, setRawInputUtterance] = useState<string>("");
+  const [analysisResult, setAnalysisResult] = useState<CheckinExtractionResult["analysis"] | undefined>();
 
   // Pre-fill when an entry already exists for the chosen date
   useEffect(() => {
@@ -171,6 +175,7 @@ function Checkin() {
     setEmergencyWarning(null);
     setAmbiguityWarning(null);
     setAmbiguityReasonsList([]);
+    setAnalysisResult(undefined);
     setSourceDoc(docFilename ? { name: docFilename, page: docPage } : undefined);
 
     try {
@@ -232,6 +237,10 @@ function Checkin() {
       if (extracted.isAmbiguous && extracted.ambiguityReason) {
         setAmbiguityWarning(extracted.ambiguityReason);
         setAmbiguityReasonsList([extracted.ambiguityReason]);
+      }
+
+      if (extracted.analysis) {
+        setAnalysisResult(extracted.analysis);
       }
 
       setActiveSource(src);
@@ -376,6 +385,7 @@ function Checkin() {
           {/* Main Unified Input Bar */}
           <UnifiedCheckinComposer
             onTextSubmit={(text) => executeExtraction(text, "conversational", language)}
+            onEnhanceSubmit={(text) => executeExtraction(text, "conversational", language)}
             onVoiceTranscriptReady={(transcript, lang) => {
               const cleanLang = lang.startsWith("ta") ? "ta" : lang.startsWith("hi") ? "hi" : "en";
               void executeExtraction(transcript, "voice", cleanLang);
@@ -443,6 +453,7 @@ function Checkin() {
           sourceDocument={sourceDoc?.name}
           sourcePage={sourceDoc?.page}
           inputUtterance={rawInputUtterance}
+          analysis={analysisResult}
           onEdit={() => setMode("composer")}
           onConfirm={handleConfirmSave}
           busy={busy}
