@@ -74,6 +74,9 @@ export function isFileSystemAccessSupported(): boolean {
 export async function saveFolderHandle(handle: FileSystemDirectoryHandle): Promise<void> {
   const d = await getDb();
   await d.put(STORE_HANDLES, handle, HANDLE_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("healthguardian:folder-updated"));
+  }
 }
 
 /**
@@ -99,6 +102,9 @@ export async function removeFolderHandle(): Promise<void> {
     const d = await getDb();
     await d.delete(STORE_HANDLES, HANDLE_KEY);
     await d.clear(STORE_METADATA);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("healthguardian:folder-updated"));
+    }
   } catch (err) {
     console.warn("Could not remove folder handle:", err);
   }
@@ -131,11 +137,61 @@ export async function verifyFolderPermission(
 }
 
 /**
- * Scan files inside the directory handle and detect new / changed files
+ * Universally retrieves all handles directly inside a FileSystemDirectoryHandle
+ * Supporting values(), entries(), and Symbol.asyncIterator across Chromium builds.
+ */
+export async function getDirectoryEntries(
+  handle: FileSystemDirectoryHandle,
+): Promise<FileSystemHandle[]> {
+  const items: FileSystemHandle[] = [];
+
+  if (typeof handle.values === "function") {
+    try {
+      // @ts-expect-error values() iterator is standard in Chromium
+      for await (const entry of handle.values()) {
+        items.push(entry);
+      }
+      return items;
+    } catch (err) {
+      console.warn("handle.values() iteration failed, trying entries():", err);
+    }
+  }
+
+  if (typeof handle.entries === "function") {
+    try {
+      // @ts-expect-error entries() iterator
+      for await (const [, entry] of handle.entries()) {
+        items.push(entry);
+      }
+      return items;
+    } catch (err) {
+      console.warn("handle.entries() iteration failed:", err);
+    }
+  }
+
+  if (typeof (handle as unknown as AsyncIterable<unknown>)[Symbol.asyncIterator] === "function") {
+    try {
+      for await (const item of (handle as unknown as AsyncIterable<unknown>)) {
+        const entry = Array.isArray(item) ? item[1] : item;
+        if (entry && typeof entry === "object" && "kind" in (entry as Record<string, unknown>)) {
+          items.push(entry as FileSystemHandle);
+        }
+      }
+    } catch (err) {
+      console.warn("handle asyncIterator failed:", err);
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Scan files inside the directory handle and detect new, changed, and removed files.
+ * Always reads from the live directory handle, not cached snapshots.
  */
 export async function scanFolderFiles(
   handle: FileSystemDirectoryHandle,
-): Promise<{ files: ConnectedFileEntry[]; newCount: number }> {
+): Promise<{ files: ConnectedFileEntry[]; newCount: number; removedCount: number }> {
   const d = await getDb();
   const knownMeta = new Map<string, { size: number; lastModified: number }>();
 
@@ -153,53 +209,98 @@ export async function scanFolderFiles(
   }
 
   const entries: ConnectedFileEntry[] = [];
+  const currentFilenames = new Set<string>();
   let newCount = 0;
 
   try {
-    // @ts-expect-error values() iterator is supported on FileSystemDirectoryHandle
-    for await (const entry of handle.values()) {
+    const rawHandles = await getDirectoryEntries(handle);
+
+    for (const entry of rawHandles) {
       if (entry.kind === "file") {
         const fileHandle = entry as FileSystemFileHandle;
-        const file = await fileHandle.getFile();
-        const supported = isFileSupported(file.name);
+        currentFilenames.add(fileHandle.name);
 
-        let isNew = false;
-        let isChanged = false;
+        try {
+          const file = await fileHandle.getFile();
+          const supported = isFileSupported(file.name);
 
-        if (supported) {
-          const prev = knownMeta.get(file.name);
-          if (!prev) {
-            isNew = true;
-            newCount++;
-          } else if (prev.lastModified !== file.lastModified || prev.size !== file.size) {
-            isChanged = true;
+          let isNew = false;
+          let isChanged = false;
+
+          if (supported) {
+            const prev = knownMeta.get(file.name);
+            if (!prev) {
+              isNew = true;
+              newCount++;
+            } else if (prev.lastModified !== file.lastModified || prev.size !== file.size) {
+              isChanged = true;
+            }
           }
-        }
 
-        entries.push({
-          name: file.name,
-          size: file.size,
-          lastModified: file.lastModified,
-          type: file.type || "application/octet-stream",
-          isSupported: supported,
-          isNew,
-          isChanged,
-          fileHandle,
-        });
+          entries.push({
+            name: file.name,
+            size: file.size,
+            lastModified: file.lastModified,
+            type: file.type || "application/octet-stream",
+            isSupported: supported,
+            isNew,
+            isChanged,
+            fileHandle,
+          });
+        } catch (fileErr) {
+          console.warn(`Could not read individual file metadata for ${entry.name}:`, fileErr);
+          // Preserve entry so an individual locked file does not abort the entire folder scan
+          entries.push({
+            name: entry.name,
+            size: 0,
+            lastModified: Date.now(),
+            type: "application/octet-stream",
+            isSupported: isFileSupported(entry.name),
+            isNew: false,
+            isChanged: false,
+            fileHandle,
+          });
+        }
       }
     }
   } catch (err) {
     console.error("Error reading directory contents:", err);
   }
 
+  // Count and clean up removed files from metadata
+  let removedCount = 0;
+  try {
+    const tx = d.transaction(STORE_METADATA, "readwrite");
+    for (const knownName of knownMeta.keys()) {
+      if (!currentFilenames.has(knownName)) {
+        removedCount++;
+        await tx.store.delete(knownName);
+      }
+    }
+    await tx.done;
+  } catch (err) {
+    console.warn("Could not clean up removed files metadata:", err);
+  }
+
+  // Deduplicate entries by filename in case multiple iterations yielded the same handle
+  const uniqueEntries = Array.from(
+    entries.reduce((map, item) => {
+      if (!map.has(item.name)) {
+        map.set(item.name, item);
+      }
+      return map;
+    }, new Map<string, ConnectedFileEntry>()).values(),
+  );
+
   // Sort files: supported first, then new/changed first, then alphabetical
-  entries.sort((a, b) => {
+  uniqueEntries.sort((a, b) => {
     if (a.isSupported !== b.isSupported) return a.isSupported ? -1 : 1;
     if (a.isNew !== b.isNew) return a.isNew ? -1 : 1;
+    if (a.isChanged !== b.isChanged) return a.isChanged ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
 
-  return { files: entries, newCount };
+  return { files: uniqueEntries, newCount, removedCount };
 }
 
 /**

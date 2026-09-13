@@ -25,6 +25,7 @@ import { deleteAccount, getFirebaseAuth, logout, resetPassword } from "@/service
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { LanguageSelector } from "@/features/i18n/LanguageSelector";
 import { useTranslation } from "@/locales/i18n";
+import { useCapabilities } from "@/core/capabilities";
 
 export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
@@ -44,11 +45,12 @@ export const Route = createFileRoute("/app/settings")({
   }),
 });
 
-function SettingsPage() {
+export function SettingsPage() {
   const uid = useUid();
-  const navigate = useNavigate();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useTranslation();
+  const { canWebShare, isTouchDevice } = useCapabilities();
   const profile = useProfile(uid);
   const health = useHealthProfile(uid);
   const [p, setP] = useState({
@@ -177,12 +179,37 @@ function SettingsPage() {
       ],
       { type: "application/json" },
     );
+    const fileName = `healthguardian-export-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([blob], fileName, { type: "application/json" });
+
+    if (
+      canWebShare &&
+      isTouchDevice &&
+      typeof navigator !== "undefined" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    ) {
+      try {
+        await navigator.share({
+          title: "HealthGuardian Data Export",
+          text: "HealthGuardian health records export",
+          files: [file],
+        });
+        toast.success(t("common.success"));
+        return;
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+      }
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `healthguardian-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   const wipe = async () => {

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, BellRing, Check, CheckCheck, Clock, Filter, Inbox, Trash2 } from "lucide-react";
+import { Bell, BellOff, BellRing, Check, CheckCheck, Clock, Filter, Inbox, Info, Smartphone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useUid } from "@/features/auth/useAuth";
 import { useNotificationsQuery } from "@/features/health/queries";
+import { useCapabilities } from "@/core/capabilities";
 import {
   dismiss,
   markRead,
@@ -52,24 +53,25 @@ export function NotificationsPage() {
   const [filter, setFilter] = useState<"all" | "unread" | "high">("all");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const permission = notificationPermission();
+  const capabilities = useCapabilities();
+  const { notificationState, isIosSafari, isStandalonePwa } = capabilities;
 
   // Auto-sync FCM device token when permission is granted
   useEffect(() => {
-    if (uid && permission === "granted") {
+    if (uid && typeof Notification !== "undefined" && Notification.permission === "granted") {
       void ensureWebPushSubscribed(uid);
     }
-  }, [uid, permission]);
+  }, [uid, notificationState]);
 
   const enable = async () => {
     const res = await requestNotificationPermission();
     if (res === "granted") {
       const push = uid ? await registerWebPush(uid) : { ok: false };
-      toast.success(push.ok ? "Alerts enabled on this device." : "Browser alerts enabled.");
+      toast.success(push.ok ? "Device alerts enabled." : "In-app alerts active.");
     } else if (res === "unsupported") {
-      toast.error(t("common.error"));
-    } else {
-      toast.warning(t("common.offlineNotice"));
+      toast.info("Notifications are not supported in this browser.");
+    } else if (res === "denied") {
+      toast.info("Notifications were declined. In-app alerts remain active below.");
     }
   };
 
@@ -153,20 +155,57 @@ export function NotificationsPage() {
         <div className="flex items-center gap-1.5">
           <ContextualHelp content="Alerts are for awareness, not emergency monitoring. Notifications never expose private clinical details." />
 
-          {permission !== "granted" && (
+          {notificationState === "default" && (
             <Button
               variant="default"
               size="sm"
               onClick={() => void enable()}
-              className="h-8 text-xs gap-1.5 rounded-full touch-press shadow-xs"
+              className="h-8 text-xs gap-1.5 rounded-full touch-press shadow-xs cursor-pointer"
               disabled={isProcessing}
             >
               <BellRing className="size-3.5" />
-              <span>{t("notifications.enableAlerts")}</span>
+              <span>{t("notifications.enableAlerts") || "Enable Alerts"}</span>
             </Button>
+          )}
+
+          {notificationState === "denied" && (
+            <Badge variant="outline" className="text-[11px] text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5 gap-1">
+              <BellOff className="size-3" /> Blocked in browser
+            </Badge>
+          )}
+
+          {(notificationState === "granted_local" || notificationState === "fcm_active") && (
+            <Badge variant="outline" className="text-[11px] text-success border-success/30 bg-success/5 gap-1">
+              <Check className="size-3" /> Alerts active
+            </Badge>
           )}
         </div>
       </div>
+
+      {/* Capability-Specific Guidance Banners */}
+      {notificationState === "denied" && (
+        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-foreground">
+          <BellOff className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-foreground">Device notifications are blocked</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Browser alerts have been declined or blocked in your site settings. HealthGuardian will continue to display all reminders and notifications directly in the list below. To receive device lock-screen alerts, please enable notifications in your browser's site settings.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isIosSafari && !isStandalonePwa && notificationState !== "denied" && (
+        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs text-foreground">
+          <Smartphone className="size-4 shrink-0 mt-0.5 text-primary" />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-primary">Enable Background Alerts on iPhone / iPad</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Apple requires web apps to be installed to receive background alerts. Tap Safari's <strong>Share</strong> button and select <strong>'Add to Home Screen'</strong> to enable lock-screen health reminders.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Filter Tabs & Bulk Actions Bar */}
       <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5">

@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/locales/i18n";
+import { useCapabilities } from "@/core/capabilities";
 
 interface ChatComposerProps {
   input: string;
@@ -33,12 +34,16 @@ export function ChatComposer({
   onRemoveAttachment,
 }: ChatComposerProps) {
   const { t } = useTranslation();
+  const { hasFinePointer, isTouchDevice } = useCapabilities();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-focus input on mount
+  // Only auto-focus input on mount if device has a fine pointer (desktop/laptop)
+  // Avoids abruptly triggering virtual on-screen keyboards on touch devices
   useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
+    if (hasFinePointer && !isTouchDevice) {
+      textareaRef.current?.focus();
+    }
+  }, [hasFinePointer, isTouchDevice]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

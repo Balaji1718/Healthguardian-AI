@@ -415,6 +415,9 @@ function Checkin() {
               void executeExtraction(transcript, "voice", cleanLang);
             }}
             onFileSelect={handleDeviceFileSelect}
+            onFolderConnected={() => {
+              window.dispatchEvent(new Event("healthguardian:folder-updated"));
+            }}
             extracting={extracting}
           />
 

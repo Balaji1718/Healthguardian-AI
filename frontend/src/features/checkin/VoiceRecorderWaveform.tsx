@@ -186,6 +186,37 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (!speech.isSupported) {
+    return (
+      <div className="rounded-2xl border bg-card/95 backdrop-blur-md p-4 shadow-md transition-all space-y-3">
+        <div className="flex items-start gap-2.5">
+          <div className="size-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <MicOff className="size-4" />
+          </div>
+          <div className="space-y-1 min-w-0 flex-1">
+            <h4 className="text-xs font-semibold text-foreground">
+              Voice check-in is not supported in this browser
+            </h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              This browser (such as Firefox or restricted WebViews) does not provide the Web Speech API. You can describe your day naturally in the check-in box instead.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end pt-1">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={onCancel}
+            className="text-xs h-8 cursor-pointer"
+          >
+            Switch to text input
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border bg-card/95 backdrop-blur-md p-4 shadow-md transition-all space-y-4">
       {/* Header with Language Selector & Accessibility Status */}

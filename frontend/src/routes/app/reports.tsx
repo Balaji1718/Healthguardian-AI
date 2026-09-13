@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2, FileText, Loader2, ScanLine, Trash2, Upload } from "lucide-react";
+import { Camera, CheckCircle2, FileText, Image as ImageIcon, Loader2, ScanLine, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { useUid } from "@/features/auth/useAuth";
 import { useReports, useResults } from "@/features/health/queries";
 import { reportMetaSchema } from "@/core/validation/schemas";
+import { useCapabilities } from "@/core/capabilities";
 import {
   ALLOWED_MIME,
   deleteLocalDocument,
@@ -65,10 +66,12 @@ export function ReportsPage() {
   const uid = useUid();
   const qc = useQueryClient();
   const { t } = useTranslation();
+  const { canDirectCameraCapture } = useCapabilities();
   const { data, isLoading, isError, refetch } = useReports(uid);
   const [file, setFile] = useState<File | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [meta, setMeta] = useState({
     reportTitle: "",
     reportType: "blood_test",
@@ -197,8 +200,17 @@ export function ReportsPage() {
       return;
     }
     const url = URL.createObjectURL(doc.blob);
-    window.open(url, "_blank", "noopener");
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    const win = window.open(url, "_blank", "noopener");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.name || "medical-report";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   if (isLoading) return <LoadingState label={t("common.loading")} />;
@@ -267,17 +279,21 @@ export function ReportsPage() {
             <ContextualHelp content={t("reports.contextHelp")} />
           </div>
 
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const selected = e.target.files?.[0];
-              if (selected) setFile(selected);
-            }}
-          />
+          {/* Mobile direct camera capture input (only wired if supported) */}
+          {canDirectCameraCapture && (
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const selected = e.target.files?.[0];
+                if (selected) setFile(selected);
+              }}
+            />
+          )}
+          {/* Universal file input (PDF or images) */}
           <input
             ref={fileInputRef}
             type="file"
@@ -288,31 +304,65 @@ export function ReportsPage() {
               if (selected) setFile(selected);
             }}
           />
+          {/* Dedicated image picker for desktop environments without capture attribute */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const selected = e.target.files?.[0];
+              if (selected) setFile(selected);
+            }}
+          />
 
           {!file ? (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5 text-primary transition-colors hover:bg-primary/10 hover:border-primary"
-              >
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
-                  <Camera className="size-5" />
-                </div>
-                <div className="text-left min-w-0">
-                  <p className="text-sm font-semibold truncate">
-                    {t("reports.takePhoto") || "Take Photo of Report"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    Direct mobile camera scan
-                  </p>
-                </div>
-              </button>
+              {canDirectCameraCapture ? (
+                /* Mobile / Tablet: Real rear camera scan supported */
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5 text-primary transition-colors hover:bg-primary/10 hover:border-primary cursor-pointer"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                    <Camera className="size-5" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-sm font-semibold truncate">
+                      {t("reports.takePhoto") || "Take Photo of Report"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      Direct mobile camera scan
+                    </p>
+                  </div>
+                </button>
+              ) : (
+                /* Desktop / Laptop: Explicit image upload without misleading camera claim */
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5 text-primary transition-colors hover:bg-primary/10 hover:border-primary cursor-pointer"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                    <ImageIcon className="size-5" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-sm font-semibold truncate">
+                      {t("reports.uploadImage") || "Select Report Image"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      PNG, JPG, or WEBP photo of report
+                    </p>
+                  </div>
+                </button>
+              )}
 
+              {/* Universal PDF / File Upload Action */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card p-3.5 transition-colors hover:bg-muted/50 hover:border-primary/50"
+                className="touch-press flex min-h-[56px] items-center gap-3 rounded-xl border-2 border-dashed border-border bg-card p-3.5 transition-colors hover:bg-muted/50 hover:border-primary/50 cursor-pointer"
               >
                 <div className="flex size-10 items-center justify-center rounded-full bg-muted text-foreground shrink-0">
                   <Upload className="size-5" />
@@ -322,7 +372,7 @@ export function ReportsPage() {
                     {t("reports.chooseFile") || "Upload PDF or File"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {t("reports.uploadBoxHint")}
+                    {t("reports.uploadBoxHint") || "PDF, PNG, JPG up to 15 MB"}
                   </p>
                 </div>
               </button>

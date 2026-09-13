@@ -118,6 +118,15 @@ export function ConnectedFolderPanel({
 
   useEffect(() => {
     void checkStoredFolder();
+
+    const handleFolderUpdated = () => {
+      void checkStoredFolder();
+    };
+
+    window.addEventListener("healthguardian:folder-updated", handleFolderUpdated);
+    return () => {
+      window.removeEventListener("healthguardian:folder-updated", handleFolderUpdated);
+    };
   }, [checkStoredFolder]);
 
   // Reconnect / request permission for existing handle
@@ -149,35 +158,86 @@ export function ConnectedFolderPanel({
     setViewingFiles(false);
     setSelectedFilenames([]);
     setIsPreviewOpen(false);
+    setPreviewEntry(null);
     toast.success("Health folder disconnected.");
   };
 
-  // Refresh files
+  // Refresh files with actual live directory re-scan and state reconciliation
   const handleRefresh = async () => {
     setLoading(true);
     const handle = await getStoredFolderHandle();
-    if (handle) {
-      const granted = await verifyFolderPermission(handle, false);
-      if (granted) {
-        const { files, newCount } = await scanFolderFiles(handle);
-        const supported = files.filter((f) => f.isSupported).length;
-        setStatus((prev) => ({
-          ...prev,
-          hasPermission: true,
-          files,
-          supportedCount: supported,
-          newCount,
-        }));
-        if (newCount > 0) {
-          toast.info(`${newCount} new health files found in connected folder.`);
-        } else {
-          toast.success("Files refreshed. Up to date.");
-        }
-      } else {
-        setStatus((prev) => ({ ...prev, hasPermission: false }));
-      }
+    if (!handle) {
+      setStatus({
+        isConnected: false,
+        hasPermission: false,
+        folderName: null,
+        files: [],
+        supportedCount: 0,
+        newCount: 0,
+      });
+      toast.error("No connected folder found. Please connect a folder first.");
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      // User gesture allows requesting permission if demoted by Chromium
+      const granted = await verifyFolderPermission(handle, true);
+      if (!granted) {
+        setStatus((prev) => ({ ...prev, hasPermission: false }));
+        toast.error("Folder read permission was revoked or denied. Please click Reconnect.");
+        setLoading(false);
+        return;
+      }
+
+      // Re-scan directory from live directory handle
+      const { files, newCount, removedCount } = await scanFolderFiles(handle);
+      const supported = files.filter((f) => f.isSupported).length;
+
+      setStatus((prev) => ({
+        ...prev,
+        isConnected: true,
+        hasPermission: true,
+        folderName: handle.name || prev.folderName || "Health Folder",
+        files,
+        supportedCount: supported,
+        newCount,
+      }));
+
+      // Reconcile selected filenames: purge any that no longer exist
+      const existingNames = new Set(files.map((f) => f.name));
+      setSelectedFilenames((prev) => prev.filter((name) => existingNames.has(name)));
+
+      // Reconcile preview entry: close preview if removed, otherwise update entry metadata
+      setPreviewEntry((prev) => {
+        if (!prev) return null;
+        const matching = files.find((f) => f.name === prev.name);
+        if (!matching) {
+          setIsPreviewOpen(false);
+          toast.info(`The file "${prev.name}" was removed from the connected folder.`);
+          return null;
+        }
+        return matching;
+      });
+
+      // Clear, informative feedback
+      if (newCount > 0 && removedCount > 0) {
+        toast.info(`Folder refreshed: ${newCount} added, ${removedCount} removed.`);
+      } else if (newCount > 0) {
+        toast.info(`${newCount} new health file${newCount > 1 ? "s" : ""} found in folder.`);
+      } else if (removedCount > 0) {
+        toast.info(`${removedCount} file${removedCount > 1 ? "s were" : " was"} removed from folder.`);
+      } else if (files.length === 0) {
+        toast.info("Folder refreshed: connected directory is currently empty.");
+      } else {
+        toast.success("Folder refreshed. All files are up to date.");
+      }
+    } catch (err) {
+      console.error("Folder re-scan error:", err);
+      toast.error("Failed to re-scan folder. The directory may have moved or become inaccessible.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filtered files calculation
@@ -420,15 +480,16 @@ export function ConnectedFolderPanel({
 
               <Button
                 type="button"
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
                 onClick={handleRefresh}
                 disabled={loading}
-                className="size-7 text-muted-foreground hover:text-foreground"
-                title="Refresh files"
-                aria-label="Refresh files"
+                className="text-xs h-7 px-2.5 gap-1.5 text-muted-foreground hover:text-foreground"
+                title="Scan and refresh folder contents"
+                aria-label="Scan and refresh folder contents"
               >
-                <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
+                <span>{loading ? "Scanning..." : "Refresh"}</span>
               </Button>
             </>
           ) : (

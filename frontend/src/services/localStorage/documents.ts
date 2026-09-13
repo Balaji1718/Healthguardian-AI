@@ -7,18 +7,35 @@ import { openDB, type IDBPDatabase } from "idb";
 const DB_NAME = "healthguardian-local";
 const STORE = "documents";
 const CACHE = "cache";
+const STORE_HANDLES = "folder_handles";
+const STORE_METADATA = "folder_file_meta";
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
+let idbUnavailable = false;
 
-function db() {
-  if (typeof window === "undefined") throw new Error("IndexedDB is browser only");
+const memoryDocuments = new Map<string, LocalDocument>();
+const memoryCache = new Map<string, { value: unknown; at: number }>();
+
+async function db(): Promise<IDBPDatabase | null> {
+  if (typeof window === "undefined" || idbUnavailable) return null;
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
-      upgrade(d) {
-        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
-        if (!d.objectStoreNames.contains(CACHE)) d.createObjectStore(CACHE);
-      },
-    });
+    try {
+      dbPromise = openDB(DB_NAME, 2, {
+        upgrade(d) {
+          if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
+          if (!d.objectStoreNames.contains(CACHE)) d.createObjectStore(CACHE);
+          if (!d.objectStoreNames.contains(STORE_HANDLES)) d.createObjectStore(STORE_HANDLES);
+          if (!d.objectStoreNames.contains(STORE_METADATA)) d.createObjectStore(STORE_METADATA, { keyPath: "name" });
+        },
+      });
+      // Test connectivity
+      await dbPromise;
+    } catch (err) {
+      console.warn("IndexedDB unavailable, falling back to in-memory document storage:", err);
+      idbUnavailable = true;
+      dbPromise = null;
+      return null;
+    }
   }
   return dbPromise;
 }
@@ -45,8 +62,7 @@ export function validateFile(file: File): string | null {
 
 export async function saveLocalDocument(uid: string, file: File): Promise<string> {
   const id = `${uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const d = await db();
-  await d.put(STORE, {
+  const item: LocalDocument = {
     id,
     uid,
     name: file.name,
@@ -54,43 +70,99 @@ export async function saveLocalDocument(uid: string, file: File): Promise<string
     size: file.size,
     blob: file,
     createdAt: Date.now(),
-  } satisfies LocalDocument);
+  };
+
+  const d = await db();
+  if (d) {
+    try {
+      await d.put(STORE, item);
+      return id;
+    } catch (err) {
+      console.warn("IndexedDB put failed, caching in memory:", err);
+    }
+  }
+
+  memoryDocuments.set(id, item);
   return id;
 }
 
 export async function getLocalDocument(uid: string, id: string): Promise<LocalDocument | null> {
   const d = await db();
-  const doc = (await d.get(STORE, id)) as LocalDocument | undefined;
-  // Ownership check: a local document is only readable by its owner.
-  if (!doc || doc.uid !== uid) return null;
-  return doc;
+  if (d) {
+    try {
+      const doc = (await d.get(STORE, id)) as LocalDocument | undefined;
+      if (doc && doc.uid === uid) return doc;
+    } catch {
+      // fallback to memory
+    }
+  }
+
+  const memDoc = memoryDocuments.get(id);
+  if (memDoc && memDoc.uid === uid) return memDoc;
+  return null;
 }
 
 export async function listLocalDocuments(uid: string): Promise<LocalDocument[]> {
+  const list: LocalDocument[] = [];
   const d = await db();
-  const all = (await d.getAll(STORE)) as LocalDocument[];
-  return all.filter((x) => x.uid === uid);
+  if (d) {
+    try {
+      const all = (await d.getAll(STORE)) as LocalDocument[];
+      list.push(...all.filter((x) => x.uid === uid));
+    } catch {
+      // fallback to memory
+    }
+  }
+
+  // Include any in-memory documents not in IndexedDB
+  for (const doc of memoryDocuments.values()) {
+    if (doc.uid === uid && !list.some((existing) => existing.id === doc.id)) {
+      list.push(doc);
+    }
+  }
+
+  return list;
 }
 
 export async function deleteLocalDocument(uid: string, id: string) {
-  const doc = await getLocalDocument(uid, id);
-  if (!doc) return;
+  memoryDocuments.delete(id);
   const d = await db();
-  await d.delete(STORE, id);
+  if (d) {
+    try {
+      await d.delete(STORE, id);
+    } catch {
+      // best-effort
+    }
+  }
 }
 
 export async function deleteAllLocalDocuments(uid: string) {
-  const docs = await listLocalDocuments(uid);
+  for (const [id, doc] of Array.from(memoryDocuments.entries())) {
+    if (doc.uid === uid) {
+      memoryDocuments.delete(id);
+    }
+  }
+
   const d = await db();
-  await Promise.all(docs.map((x) => d.delete(STORE, x.id)));
+  if (d) {
+    try {
+      const docs = await listLocalDocuments(uid);
+      await Promise.all(docs.map((x) => d.delete(STORE, x.id)));
+    } catch {
+      // best-effort
+    }
+  }
 }
 
 /* ------------------------------- data cache -------------------------------- */
 
 export async function cacheSet(key: string, value: unknown) {
+  memoryCache.set(key, { value, at: Date.now() });
   try {
     const d = await db();
-    await d.put(CACHE, { value, at: Date.now() }, key);
+    if (d) {
+      await d.put(CACHE, { value, at: Date.now() }, key);
+    }
   } catch {
     /* cache is best-effort */
   }
@@ -99,15 +171,32 @@ export async function cacheSet(key: string, value: unknown) {
 export async function cacheGet<T>(key: string): Promise<T | null> {
   try {
     const d = await db();
-    const hit = (await d.get(CACHE, key)) as { value: T } | undefined;
-    return hit ? hit.value : null;
+    if (d) {
+      const hit = (await d.get(CACHE, key)) as { value: T } | undefined;
+      if (hit) return hit.value;
+    }
   } catch {
-    return null;
+    // fallback to memory
   }
+
+  const mem = memoryCache.get(key);
+  return mem ? (mem.value as T) : null;
 }
 
 export async function cacheClear(uid: string) {
-  const d = await db();
-  const keys = await d.getAllKeys(CACHE);
-  await Promise.all(keys.filter((k) => String(k).startsWith(uid)).map((k) => d.delete(CACHE, k)));
+  for (const key of Array.from(memoryCache.keys())) {
+    if (key.startsWith(uid)) {
+      memoryCache.delete(key);
+    }
+  }
+
+  try {
+    const d = await db();
+    if (d) {
+      const keys = await d.getAllKeys(CACHE);
+      await Promise.all(keys.filter((k) => String(k).startsWith(uid)).map((k) => d.delete(CACHE, k)));
+    }
+  } catch {
+    // best-effort
+  }
 }

@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 
 import { useTranslation } from "@/locales/i18n";
+import { useCapabilities } from "@/core/capabilities";
 
 interface UnifiedCheckinComposerProps {
   onTextSubmit: (text: string) => void;
@@ -66,6 +67,7 @@ export function UnifiedCheckinComposer({
   extracting,
 }: UnifiedCheckinComposerProps) {
   const { language, t } = useTranslation();
+  const { canSpeechRecognize, canAccessFileSystem } = useCapabilities();
   const [inputText, setInputText] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -189,31 +191,45 @@ export function UnifiedCheckinComposer({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem
-                  onClick={() => setIsRecordingVoice(true)}
-                  className="gap-2.5 py-2 cursor-pointer"
-                >
-                  <Mic className="size-4 text-primary" />
-                  <div>
-                    <span className="font-medium block">Voice Check-in</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Multilingual voice dictation (up to 5m)
-                    </span>
+                {canSpeechRecognize ? (
+                  <DropdownMenuItem
+                    onClick={() => setIsRecordingVoice(true)}
+                    className="gap-2.5 py-2 cursor-pointer"
+                  >
+                    <Mic className="size-4 text-primary" />
+                    <div>
+                      <span className="font-medium block">Voice Check-in</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Multilingual voice dictation (up to 5m)
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ) : (
+                  <div className="flex items-center gap-2.5 px-2 py-1.5 opacity-60">
+                    <Mic className="size-4 text-muted-foreground" />
+                    <div>
+                      <span className="font-medium block text-xs">Voice Check-in</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Not supported in this browser (use text)
+                      </span>
+                    </div>
                   </div>
-                </DropdownMenuItem>
+                )}
 
-                <DropdownMenuItem
-                  onClick={handleConnectFolder}
-                  className="gap-2.5 py-2 cursor-pointer"
-                >
-                  <FolderPlus className="size-4 text-primary" />
-                  <div>
-                    <span className="font-medium block">Connect health folder</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Persistent local files
-                    </span>
-                  </div>
-                </DropdownMenuItem>
+                {canAccessFileSystem && (
+                  <DropdownMenuItem
+                    onClick={handleConnectFolder}
+                    className="gap-2.5 py-2 cursor-pointer"
+                  >
+                    <FolderPlus className="size-4 text-primary" />
+                    <div>
+                      <span className="font-medium block">Connect health folder</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Persistent local files (Desktop)
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                )}
 
                 <DropdownMenuItem
                   onClick={() => fileInputRef.current?.click()}
@@ -247,19 +263,21 @@ export function UnifiedCheckinComposer({
               />
             </div>
 
-            {/* Direct Microphone Button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsRecordingVoice(true)}
-              disabled={extracting}
-              className="size-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0"
-              title="Start voice check-in"
-              aria-label="Start voice check-in"
-            >
-              <Mic className="size-4" />
-            </Button>
+            {/* Direct Microphone Button (only displayed if speech recognition is available) */}
+            {canSpeechRecognize && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsRecordingVoice(true)}
+                disabled={extracting}
+                className="size-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0 cursor-pointer"
+                title="Start voice check-in"
+                aria-label="Start voice check-in"
+              >
+                <Mic className="size-4" />
+              </Button>
+            )}
 
             {/* Enhance & Analyze AI Action Button */}
             {inputText.trim() ? (
