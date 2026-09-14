@@ -109,7 +109,10 @@ function plannedTools(
             { name: "getMedicalReport", args: { reportId } },
             { name: "getVerifiedMedicalResults", args: { reportId } },
           ]
-        : [{ name: "getHealthHistory", args: { limit: 40 } }];
+        : [
+            { name: "getLatestLabResults", args: { limit: 20 } },
+            { name: "getHealthHistory", args: { limit: 40 } },
+          ];
     case "analyze_health":
       return [
         { name: "getDailyCheckins", args: { days: 14 } },

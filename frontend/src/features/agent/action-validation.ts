@@ -20,6 +20,7 @@ const toolArgumentSchemas: Record<string, z.ZodType<Record<string, unknown>>> = 
   getNotificationState: z.object({}).strict(),
   getMedicalReport: z.object({ reportId: z.string().min(1) }).strict(),
   getVerifiedMedicalResults: z.object({ reportId: z.string().min(1) }).strict(),
+  getLatestLabResults: z.object({ limit: z.number().finite().min(1).max(200).optional() }).strict(),
   calculatePersonalBaseline: z
     .object({
       metric: z

@@ -22,6 +22,7 @@ import {
   listNotifications,
   listResults,
   listVerifiedResults,
+  listAllVerifiedResults,
   saveAssessment,
   toDate,
 } from "@/services/firebase/repositories";
@@ -160,6 +161,9 @@ export const TOOLS: ToolDefinition[] = [
         unit: r.unit ?? "",
         at: toDate(r.recordedAt)?.toISOString().slice(0, 10),
         source: r.sourceType,
+        sourceName: r.sourceName,
+        reference: r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
+        flag: r.flag || "normal",
       }));
       return {
         ok: true,
@@ -219,6 +223,31 @@ export const TOOLS: ToolDefinition[] = [
         flag: r.flag ?? "unknown",
       }));
       return { ok: true, data, summary: `${data.length} verified results.` };
+    },
+  },
+  {
+    name: "getLatestLabResults",
+    description: "User-verified structured lab test results from latest medical reports. Args: { limit?: number }",
+    args: '{ "limit": 20 }',
+    readOrWrite: "read",
+    authorizationRequired: true,
+    async run({ uid }, args) {
+      const limit = Math.min(100, num(args["limit"], 20));
+      const results = await listAllVerifiedResults(uid, limit);
+      const data = results.map((r) => ({
+        testName: r.testName,
+        value: r.resultValue,
+        unit: r.unit ?? "",
+        reference: r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
+        flag: r.flag || "normal",
+        page: r.sourcePage ?? 1,
+        date: r.verifiedAt ? r.verifiedAt.toISOString().slice(0, 10) : undefined,
+      }));
+      return {
+        ok: true,
+        data,
+        summary: `${data.length} verified lab results available from clinical reports.`,
+      };
     },
   },
   {
@@ -284,7 +313,8 @@ export const TOOLS: ToolDefinition[] = [
     authorizationRequired: true,
     async run({ uid }) {
       const checkins = await listCheckins(uid, 60);
-      const patterns = detectPatterns(checkins);
+      const verifiedResults = await listAllVerifiedResults(uid, 100);
+      const patterns = detectPatterns(checkins, verifiedResults);
       return {
         ok: true,
         data: patterns,
@@ -303,7 +333,8 @@ export const TOOLS: ToolDefinition[] = [
     authorizationRequired: true,
     async run({ uid }, args) {
       const checkins = await listCheckins(uid, 60);
-      const patterns = detectPatterns(checkins);
+      const verifiedResults = await listAllVerifiedResults(uid, 100);
+      const patterns = detectPatterns(checkins, verifiedResults);
       const score = calculateHealthScore(checkins, patterns);
       const assessments = buildAssessments(patterns, checkins.map((c) => c.id!).filter(Boolean));
       if (args["persist"] === true) {

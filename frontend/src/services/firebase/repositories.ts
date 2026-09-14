@@ -277,6 +277,17 @@ export async function deleteReport(uid: string, id: string) {
   const results = await getDocs(resultsCol(uid, id));
   await Promise.all(results.docs.map((d) => deleteDoc(d.ref)));
   await deleteDoc(doc(reportsCol(uid), id));
+  // Purge synchronized canonical health records for this report
+  try {
+    const hrSnap = await getDocs(query(recordsCol(uid), where("sourceId", "==", id)));
+    if (!hrSnap.empty) {
+      const batch = writeBatch(getDb());
+      hrSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  } catch (e) {
+    console.warn("Could not delete associated health records for report:", e);
+  }
 }
 
 export async function saveResult(
@@ -302,6 +313,80 @@ export async function listResults(uid: string, reportId: string): Promise<Medica
 /** Only verified results are trusted by the risk engine and the agent. */
 export async function listVerifiedResults(uid: string, reportId: string): Promise<MedicalResult[]> {
   return (await listResults(uid, reportId)).filter((r) => r.userVerified);
+}
+
+/**
+ * Synchronizes verified medical report biomarkers into the canonical healthRecords collection.
+ * Maintains atomic synchronization and provenance across all HealthGuardian subsystems.
+ */
+export async function syncReportToHealthRecords(
+  uid: string,
+  reportId: string,
+  reportDate: Date,
+  results: MedicalResult[],
+  reportTitle?: string,
+) {
+  const batch = writeBatch(getDb());
+  for (const r of results) {
+    if (!r.userVerified) continue;
+    const safeMetricKey = r.testName.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+    const ref = doc(recordsCol(uid), `${reportId}_${safeMetricKey}`);
+    batch.set(ref, clean({
+      metric: r.testName,
+      numericValue: r.numericValue ?? null,
+      valueText: r.resultValue,
+      unit: r.unit ?? "",
+      referenceLow: r.referenceLow ?? null,
+      referenceHigh: r.referenceHigh ?? null,
+      referenceText: r.referenceText ?? "",
+      flag: r.flag ?? "normal",
+      sourceType: "medical_report",
+      sourceId: reportId,
+      sourceName: reportTitle || "Medical Report",
+      sourcePage: r.sourcePage ?? 1,
+      userVerified: true,
+      recordedAt: Timestamp.fromDate(reportDate),
+      createdAt: serverTimestamp(),
+    }));
+  }
+  await batch.commit();
+}
+
+/**
+ * Retrieves all user-verified medical lab results across all reports.
+ * Reads directly from the canonical healthRecords store, establishing one source of truth.
+ */
+export async function listAllVerifiedResults(uid: string, max = 200): Promise<MedicalResult[]> {
+  try {
+    const q = query(
+      recordsCol(uid),
+      where("sourceType", "==", "medical_report"),
+      orderBy("recordedAt", "desc"),
+      fbLimit(max),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const data = d.data() as HealthRecord;
+      return {
+        id: d.id,
+        testName: data.metric,
+        resultValue: data.valueText ?? String(data.numericValue ?? ""),
+        numericValue: data.numericValue ?? null,
+        unit: data.unit ?? "",
+        referenceLow: data.referenceLow ?? null,
+        referenceHigh: data.referenceHigh ?? null,
+        referenceText: data.referenceText ?? "",
+        flag: data.flag ?? "normal",
+        userVerified: true,
+        sourcePage: data.sourcePage ?? 1,
+        verifiedAt: data.recordedAt ? toDate(data.recordedAt) : undefined,
+        createdAt: data.createdAt ? toDate(data.createdAt) : undefined,
+      };
+    });
+  } catch (err) {
+    console.warn("Could not query canonical health records for medical results:", err);
+    return [];
+  }
 }
 
 /* ---------------------------- risk assessments ---------------------------- */

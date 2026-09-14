@@ -115,7 +115,14 @@ export interface MedicalResult {
   referenceText?: string | undefined;
   flag?: string | undefined;
   ocrConfidence?: number | null | undefined;
+  aiConfidence?: "high" | "medium" | "low" | undefined;
+  isAmbiguous?: boolean | undefined;
+  ambiguityReason?: string | undefined;
+  ambiguousFields?: string[] | undefined;
+  groundingStatus?: Record<string, string> | undefined;
+  section?: string | undefined;
   userVerified: boolean;
+  userEdited?: boolean | undefined;
   verifiedAt?: TS | undefined;
   sourcePage?: number | null | undefined;
   createdAt?: TS | undefined;
@@ -127,8 +134,15 @@ export interface HealthRecord {
   numericValue?: number | null | undefined;
   valueText?: string | undefined;
   unit?: string | undefined;
+  referenceLow?: number | null | undefined;
+  referenceHigh?: number | null | undefined;
+  referenceText?: string | undefined;
+  flag?: string | undefined;
   sourceType: "daily_checkin" | "medical_report" | "verified_manual_entry";
   sourceId: string;
+  sourceName?: string | undefined;
+  sourcePage?: number | null | undefined;
+  userVerified?: boolean | undefined;
   recordedAt: TS;
   createdAt?: TS | undefined;
 }

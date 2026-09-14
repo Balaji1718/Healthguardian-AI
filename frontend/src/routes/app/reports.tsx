@@ -21,15 +21,21 @@ import {
   saveLocalDocument,
   validateFile,
 } from "@/services/localStorage/documents";
-import { computeFlag, extractResults, runOcr, type ExtractedCandidate } from "@/services/ocr/ocr";
+import { computeFlag, runOcr } from "@/services/ocr/ocr";
+import {
+  understandMedicalReport,
+  type StructuredBiomarkerCandidate,
+} from "@/services/ai/document-understanding";
+import { ReportVerificationPanel } from "@/features/reports/ReportVerificationPanel";
 import {
   createReport,
   deleteReport,
   saveResult,
   updateReport,
+  syncReportToHealthRecords,
   toDate,
 } from "@/services/firebase/repositories";
-import type { MedicalReport } from "@/models";
+import type { MedicalReport, MedicalResult } from "@/models";
 import { ContextualHelp } from "@/features/guide/ContextualHelp";
 import { formatReportType } from "@/locales/formatters";
 import { useTranslation } from "@/locales/i18n";
@@ -80,7 +86,10 @@ export function ReportsPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<number | null>(null);
-  const [candidates, setCandidates] = useState<ExtractedCandidate[]>([]);
+  const [progressLabel, setProgressLabel] = useState<string>("");
+  const [candidates, setCandidates] = useState<StructuredBiomarkerCandidate[]>([]);
+  const [parsedSections, setParsedSections] = useState<string[]>([]);
+  const [parsedWarnings, setParsedWarnings] = useState<string[]>([]);
   const [activeReport, setActiveReport] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -104,7 +113,8 @@ export function ReportsPage() {
     }
     setErrors({});
     setBusy(true);
-    setProgress(0);
+    setProgress(5);
+    setProgressLabel(t("reports.readingReport") || "Reading report document...");
     let localFileId = "";
     let reportId = "";
     try {
@@ -122,18 +132,35 @@ export function ReportsPage() {
       reportId = await createReport(uid, report);
       setActiveReport(reportId);
 
-      const outcome = await runOcr(file, file.type, (p) => setProgress(Math.round(p * 100)));
-      const found = outcome.pages.flatMap((pg) => extractResults(pg.text, pg.page, pg.confidence));
-      setCandidates(found);
+      // Phase 1: Document reading & character extraction
+      const outcome = await runOcr(file, file.type, (p) => {
+        setProgress(Math.round(5 + p * 45));
+      });
+
+      // Phase 2: Semantic Document Understanding & Table Reconstruction
+      setProgress(55);
+      setProgressLabel(t("reports.understandingStructure") || "Understanding report structure & table layout...");
+      const docOutcome = await understandMedicalReport(outcome.pages, meta);
+
+      // Phase 3: Organizing & Checking
+      setProgress(85);
+      setProgressLabel(t("reports.organizingResults") || "Checking extracted information & preparing review...");
+
+      setCandidates(docOutcome.candidates);
+      setParsedSections(docOutcome.sections || []);
+      setParsedWarnings(docOutcome.warnings || []);
+
       await updateReport(uid, reportId, {
-        ocrStatus: found.length ? "completed" : "failed",
+        ocrStatus: docOutcome.candidates.length ? "completed" : "failed",
         pageCount: outcome.pages.length,
       });
       await qc.invalidateQueries({ queryKey: ["reports"] });
-      toast[found.length ? "success" : "warning"](
-        found.length
-          ? t("reports.valuesReadPrompt", { count: found.length }) ||
-              `${found.length} value(s) read. Please check each one before saving.`
+
+      setProgress(100);
+      toast[docOutcome.candidates.length ? "success" : "warning"](
+        docOutcome.candidates.length
+          ? t("reports.valuesReadPrompt", { count: docOutcome.candidates.length }) ||
+              `${docOutcome.candidates.length} value(s) structured. Please verify each one before saving.`
           : t("reports.textNotReadWarning") ||
               "The text could not be read reliably. You can still keep the document and enter values manually.",
       );
@@ -148,35 +175,55 @@ export function ReportsPage() {
     } finally {
       setBusy(false);
       setProgress(null);
+      setProgressLabel("");
     }
   };
 
-  const confirmAll = async () => {
+  const handleConfirmVerifiedCandidates = async (confirmed: StructuredBiomarkerCandidate[]) => {
     if (!uid || !activeReport) return;
     setBusy(true);
     try {
-      for (const c of candidates) {
-        await saveResult(uid, activeReport, {
+      const confirmedResults: MedicalResult[] = [];
+      for (const c of confirmed) {
+        const flag = c.flag && c.flag !== "unknown"
+          ? c.flag
+          : computeFlag(
+              c.numericValue ?? null,
+              c.referenceLow ?? null,
+              c.referenceHigh ?? null,
+            );
+        const resObj: MedicalResult = {
           ...c,
-          flag: computeFlag(
-            c.numericValue ?? null,
-            c.referenceLow ?? null,
-            c.referenceHigh ?? null,
-          ),
+          flag,
           userVerified: true,
           verifiedAt: new Date(),
-        });
+        };
+        const savedId = await saveResult(uid, activeReport, resObj);
+        confirmedResults.push({ ...resObj, id: savedId });
       }
+
+      // Synchronize atomically into canonical healthRecords collection!
+      const reportDate = new Date(`${meta.reportDate}T00:00:00`);
+      await syncReportToHealthRecords(uid, activeReport, reportDate, confirmedResults, meta.reportTitle);
+
       await updateReport(uid, activeReport, {
         verificationStatus: "verified",
         verifiedAt: new Date(),
       });
+
+      // Synchronize across all relevant query caches
       await qc.invalidateQueries({ queryKey: ["reports"] });
+      await qc.invalidateQueries({ queryKey: ["healthRecords", uid] });
+      await qc.invalidateQueries({ queryKey: ["analysis", uid] });
+      await qc.invalidateQueries({ queryKey: ["assessments", uid] });
+
       setCandidates([]);
       setFile(null);
-      toast.success(t("common.success"));
-    } catch {
-      toast.error(t("common.error"));
+      setActiveReport(null);
+      toast.success(t("common.success") || "Report verified and saved to your health record!");
+    } catch (err) {
+      console.error("Confirmation error:", err);
+      toast.error(t("common.error") || "Failed to save verified report.");
     } finally {
       setBusy(false);
     }
@@ -409,11 +456,14 @@ export function ReportsPage() {
         </div>
 
         {progress !== null && (
-          <div className="space-y-1.5 rounded-lg border bg-muted/30 p-3">
-            <p className="flex items-center gap-2 text-xs sm:text-sm font-medium text-primary">
-              <ScanLine className="size-4 animate-pulse" />{" "}
-              {t("reports.readingProgress", { progress })}
-            </p>
+          <div className="space-y-2 rounded-xl border bg-muted/40 p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-primary">
+              <span className="flex items-center gap-2">
+                <ScanLine className="size-4 animate-pulse shrink-0" />
+                <span>{progressLabel || t("reports.readingProgress", { progress })}</span>
+              </span>
+              <span className="font-mono text-xs text-muted-foreground">{progress}%</span>
+            </div>
             <Progress value={progress} className="h-2" />
           </div>
         )}
@@ -433,100 +483,20 @@ export function ReportsPage() {
       </form>
 
       {candidates.length > 0 && (
-        <section className="surface mt-6 p-4 sm:p-6">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="font-semibold text-base sm:text-lg">
-                {t("reports.verifyModalTitle")}
-              </h2>
-              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-                {t("reports.verifyModalDesc")}
-              </p>
-            </div>
-            <Badge variant="outline" className="shrink-0">
-              {candidates.length} values
-            </Badge>
-          </div>
-          <div className="mt-4 space-y-3">
-            {candidates.map((c, i) => (
-              <div
-                key={i}
-                className="rounded-xl border bg-card p-3 shadow-xs space-y-2.5 sm:space-y-0 sm:grid sm:grid-cols-[2fr_1fr_1fr_auto] sm:gap-2 sm:items-center"
-              >
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground sm:hidden">Test Name</Label>
-                  <Input
-                    aria-label="Test name"
-                    value={c.testName}
-                    className="h-10 text-sm font-medium"
-                    onChange={(e) =>
-                      setCandidates((cur) =>
-                        cur.map((x, j) => (j === i ? { ...x, testName: e.target.value } : x)),
-                      )
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:contents">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground sm:hidden">Value</Label>
-                    <Input
-                      aria-label="Value"
-                      value={c.resultValue}
-                      className="h-10 text-sm"
-                      onChange={(e) =>
-                        setCandidates((cur) =>
-                          cur.map((x, j) =>
-                            j === i
-                              ? {
-                                  ...x,
-                                  resultValue: e.target.value,
-                                  numericValue: Number.parseFloat(e.target.value) || null,
-                                }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground sm:hidden">Unit</Label>
-                    <Input
-                      aria-label="Unit"
-                      value={c.unit ?? ""}
-                      className="h-10 text-sm"
-                      onChange={(e) =>
-                        setCandidates((cur) =>
-                          cur.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)),
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end sm:block">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 w-full sm:w-10 text-destructive hover:bg-destructive/10"
-                    aria-label="Remove value"
-                    onClick={() => setCandidates((cur) => cur.filter((_, j) => j !== i))}
-                  >
-                    <Trash2 className="size-4 mr-1 sm:mr-0" />
-                    <span className="sm:hidden text-xs">{t("common.delete")}</span>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Button
-            className="mt-4 w-full sm:w-auto min-h-[48px] touch-press"
-            onClick={() => void confirmAll()}
-            disabled={busy}
-          >
-            <CheckCircle2 className="mr-2 size-4" /> {t("reports.saveAllConfirmed")} (
-            {candidates.length})
-          </Button>
-        </section>
+        <ReportVerificationPanel
+          candidates={candidates}
+          reportTitle={meta.reportTitle || "Medical Report"}
+          reportDate={meta.reportDate}
+          laboratoryName={meta.laboratoryName}
+          sections={parsedSections}
+          warnings={parsedWarnings}
+          busy={busy}
+          onConfirmAll={handleConfirmVerifiedCandidates}
+          onCancel={() => {
+            setCandidates([]);
+            setFile(null);
+          }}
+        />
       )}
 
       <section className="mt-8">

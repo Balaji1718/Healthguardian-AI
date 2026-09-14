@@ -12,6 +12,8 @@ import {
   getHealthProfile,
   listSessions,
   listMessages,
+  listHealthRecords,
+  listAllVerifiedResults,
 } from "@/services/firebase/repositories";
 import { calculateHealthScore, detectPatterns } from "@/features/healthRisk/engine";
 
@@ -41,16 +43,34 @@ export const useResults = (uid: string | null, reportId: string | null) =>
     ...opts,
   });
 
+export const useHealthRecords = (uid: string | null, metric?: string, limit = 100) =>
+  useQuery({
+    queryKey: ["healthRecords", uid, metric, limit],
+    queryFn: () => listHealthRecords(uid!, metric, limit),
+    enabled: !!uid,
+    ...opts,
+  });
+
+export const useAllVerifiedResults = (uid: string | null) =>
+  useQuery({
+    queryKey: ["verifiedMedicalResults", uid],
+    queryFn: () => listAllVerifiedResults(uid!),
+    enabled: !!uid,
+    ...opts,
+  });
+
 export const useGoals = (uid: string | null) =>
   useQuery({ queryKey: ["goals", uid], queryFn: () => listGoals(uid!), enabled: !!uid, ...opts });
 
-export const useNotificationsQuery = (uid: string | null) =>
+export const useNotifications = (uid: string | null) =>
   useQuery({
     queryKey: ["notifications", uid],
     queryFn: () => listNotifications(uid!),
     enabled: !!uid,
     ...opts,
   });
+
+export const useNotificationsQuery = useNotifications;
 
 export const useAssessments = (uid: string | null) =>
   useQuery({
@@ -70,7 +90,7 @@ export const useGuidance = (uid: string | null) =>
 
 export const useSupportRequests = (uid: string | null) =>
   useQuery({
-    queryKey: ["support", uid],
+    queryKey: ["supportRequests", uid],
     queryFn: () => listSupportRequests(uid!),
     enabled: !!uid,
     ...opts,
@@ -108,11 +128,21 @@ export const useMessages = (uid: string | null, sessionId: string | null) =>
     ...opts,
   });
 
-/** Deterministic analysis derived from check-ins (no LLM involved). */
+/** Deterministic analysis derived from check-ins and canonical verified lab results. */
 export function useAnalysis(uid: string | null) {
   const q = useCheckins(uid);
+  const qLabs = useAllVerifiedResults(uid);
   const checkins = q.data ?? [];
-  const patterns = detectPatterns(checkins);
+  const verifiedResults = qLabs.data ?? [];
+  const patterns = detectPatterns(checkins, verifiedResults);
   const score = calculateHealthScore(checkins, patterns);
-  return { ...q, checkins, patterns, score };
+  return {
+    ...q,
+    isLoading: q.isLoading || qLabs.isLoading,
+    isError: q.isError || qLabs.isError,
+    checkins,
+    verifiedResults,
+    patterns,
+    score,
+  };
 }

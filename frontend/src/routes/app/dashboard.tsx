@@ -78,7 +78,7 @@ function Dashboard() {
   const qc = useQueryClient();
   const online = useAppStore((s) => s.online);
   const { t } = useTranslation();
-  const { checkins, patterns, score, isLoading, isError, refetch } = useAnalysis(uid);
+  const { checkins, verifiedResults, patterns, score, isLoading, isError, refetch } = useAnalysis(uid);
   const goals = useGoals(uid);
 
   const [loadingDemo, setLoadingDemo] = useState(false);
@@ -537,6 +537,40 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Verified Lab Biomarkers Summary Card */}
+          {verifiedResults && verifiedResults.length > 0 && (
+            <div className="surface p-4 sm:p-5 space-y-3 rounded-2xl border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="size-4 text-primary" />
+                  <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    Recent Verified Lab Biomarkers
+                  </h2>
+                </div>
+                <Link
+                  to="/app/history"
+                  className="text-xs text-primary font-medium hover:underline touch-press"
+                >
+                  View All ({verifiedResults.length}) →
+                </Link>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {verifiedResults.slice(0, 3).map((r) => (
+                  <div key={r.id || r.testName} className="p-2.5 rounded-xl bg-card border border-border/70 flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate text-foreground">{r.testName}</p>
+                      <p className="text-[11px] text-muted-foreground">{r.referenceText ? `Ref: ${r.referenceText}` : "Verified"}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-mono font-bold text-xs text-foreground">{r.resultValue} <span className="text-[10px] font-normal text-muted-foreground">{r.unit}</span></p>
+                      <Badge className={r.flag === "high" || r.flag === "abnormal" ? "bg-destructive/15 text-destructive border-destructive/30 text-[9px] px-1.5 py-0" : r.flag === "low" ? "bg-amber-500/15 text-amber-600 border-amber-500/30 text-[9px] px-1.5 py-0" : "bg-success/15 text-success border-success/30 text-[9px] px-1.5 py-0"}>{r.flag || "normal"}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Patterns & Goals Grid */}
           <div className="grid gap-3 sm:grid-cols-2">

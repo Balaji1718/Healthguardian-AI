@@ -14,6 +14,7 @@ import { getProviderHealth, providerAvailability, PROVIDER_REGISTRY, routeComple
 import { executeWebSearch } from './web-search.js';
 import { extractConversationalCheckin, convertAndImproveTranscript } from './conversational-checkin.js';
 import { interpretUserInput } from './interpretation-orchestrator.js';
+import { understandMedicalDocument } from './document-understanding.js';
 import { sendUserPush, verifyIdToken, getAdminApp } from './firebase-admin.js';
 
 const frontendRoot = path.resolve(__dirname, '../frontend');
@@ -121,6 +122,19 @@ app.post('/api/ai/improve-transcript', async (req, res) => {
     return res.status(200).json(result);
   } catch {
     return res.status(500).json({ ok: false, error: 'Transcript improvement failed.' });
+  }
+});
+
+app.post('/api/ai/understand-document', async (req, res) => {
+  const pages = Array.isArray(req.body?.pages) ? req.body.pages : [];
+  const reportMeta = req.body?.reportMeta || {};
+  if (!pages.length) return res.status(400).json({ ok: false, error: 'At least one page is required.' });
+  try {
+    const outcome = await understandMedicalDocument(pages, reportMeta);
+    return res.status(200).json({ ok: true, data: outcome });
+  } catch (err) {
+    console.error('Document understanding error:', err);
+    return res.status(500).json({ ok: false, error: 'Document understanding failed.' });
   }
 });
 
