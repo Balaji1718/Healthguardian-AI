@@ -25,13 +25,282 @@ export interface DocumentUnderstandingResult {
   error?: string;
 }
 
+export interface DocumentRegion {
+  id: string;
+  page: number;
+  startLine: number;
+  endLine: number;
+  span: number;
+  text: string;
+  normalizedText: string;
+  lines: string[];
+}
+
+export function normalizeForSearch(str: any): string {
+  return String(str || "")
+    .toLowerCase()
+    .replace(/haem/g, "hem")
+    .replace(/leuco/g, "leuko")
+    .replace(/[^\w\d.%/<>+-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
- * Reconciles an extracted candidate against the original source OCR pages.
- * Enforces:
- * - Validity of sourcePage within supplied document range
- * - Source evidence for testName, resultValue, unit, and referenceRange
- * - Strict flag-resolution hierarchy (deterministic math overrides AI claims)
- * - Field-level ambiguity tracking and diagnostic reasons
+ * Builds logical source regions from multi-page document OCR text.
+ * Represents:
+ * - Single-line regions (individual rows)
+ * - Bounded multi-line window regions (spans of 2 to 3 lines) to support
+ *   wrapped test names, values on subsequent lines, or wrapped ranges.
+ * 
+ * Each region preserves line provenance, page number, and source text.
+ */
+export function buildDocumentRegions(
+  pages: Array<{ page: number; text: string; confidence?: number | null }>,
+  options: { maxSpan?: number } = { maxSpan: 4 },
+): DocumentRegion[] {
+  const regions: DocumentRegion[] = [];
+  if (!Array.isArray(pages) || pages.length === 0) return regions;
+
+  const maxSpan = options.maxSpan || 4;
+
+  for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+    const pageObj = pages[pIdx];
+    const pageNum = pageObj?.page || pIdx + 1;
+    const pageText = pageObj?.text || "";
+
+    const rawLines = pageText.split(/\r?\n/);
+    const lineEntries: Array<{ lineIndex: number; rawText: string; normalizedText: string; hasNumber: boolean }> = [];
+
+    for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
+      const lineStr = rawLines[lIdx].trim();
+      if (lineStr.length > 0) {
+        const hasNumber = /\d+(?:\.\d+)?/.test(lineStr);
+        lineEntries.push({
+          lineIndex: lIdx + 1,
+          rawText: lineStr,
+          normalizedText: normalizeForSearch(lineStr),
+          hasNumber,
+        });
+      }
+    }
+
+    for (let i = 0; i < lineEntries.length; i++) {
+      for (let span = 1; span <= maxSpan && i + span <= lineEntries.length; span++) {
+        const spanLines = lineEntries.slice(i, i + span);
+
+        // Disallow merging two independent lines that each have their own separate test row
+        // If prevLine has a number and currLine starts with an independent test name (3+ letters) followed by a number,
+        // they are two distinct test rows and must NOT be merged!
+        if (span > 1) {
+          let hasCrossRowMerge = false;
+          for (let k = 1; k < spanLines.length; k++) {
+            const prevLine = spanLines[k - 1];
+            const currLine = spanLines[k];
+            const prevHasNum = prevLine.hasNumber;
+            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|\<|\>)/i.test(currLine.rawText);
+            const currHasWordsAndNum = /[a-zA-Z]{3,}/.test(currLine.rawText) && currLine.hasNumber;
+            if (prevHasNum && currHasWordsAndNum && !isRefContinuation) {
+              hasCrossRowMerge = true;
+              break;
+            }
+          }
+          if (hasCrossRowMerge) {
+            continue;
+          }
+        }
+
+        const combinedText = spanLines.map((l) => l.rawText).join(" ");
+        const startLine = spanLines[0].lineIndex;
+        const endLine = spanLines[spanLines.length - 1].lineIndex;
+
+        regions.push({
+          id: `p${pageNum}_L${startLine}${span > 1 ? `-${endLine}` : ""}`,
+          page: pageNum,
+          startLine,
+          endLine,
+          span,
+          text: combinedText,
+          normalizedText: normalizeForSearch(combinedText),
+          lines: spanLines.map((l) => l.rawText),
+        });
+      }
+    }
+  }
+
+  return regions;
+}
+
+/**
+ * Tests whether a value is present in a region's normalized text.
+ * Checks raw string, numeric float/int, comma formatted thousands (11,800),
+ * and comma decimals (14,2).
+ */
+export function valueMatchesInRegion(valStr: any, numVal: number | null | undefined, regionNorm: string): boolean {
+  if (!regionNorm) return false;
+  const cleanVal = normalizeForSearch(valStr);
+  if (cleanVal && regionNorm.includes(cleanVal)) return true;
+
+  if (numVal !== null && numVal !== undefined && Number.isFinite(numVal)) {
+    const numStr = String(numVal);
+    const numRegex = new RegExp(`(?:^|\\s)${numStr.replace(".", "\\.")}(?:$|\\s|%)`, "i");
+    if (numRegex.test(regionNorm) || regionNorm.includes(numStr)) return true;
+
+    // Thousands comma format e.g. 11800 -> 11,800 or normalized 11 800
+    const commaFormatted = numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    if (regionNorm.includes(normalizeForSearch(commaFormatted))) return true;
+
+    // Comma decimal format e.g. 14.2 -> 14,2
+    if (numStr.includes(".")) {
+      const commaDecimal = numStr.replace(".", ",");
+      if (regionNorm.includes(normalizeForSearch(commaDecimal))) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Tests whether a unit is present in a region's normalized text.
+ */
+export function unitMatchesInRegion(unitStr: any, regionNorm: string): boolean {
+  if (!regionNorm || !unitStr) return false;
+  const normUnit = normalizeForSearch(unitStr).replace(/µ/g, "u");
+  const regWithU = regionNorm.replace(/µ/g, "u");
+  if (regWithU.includes(normUnit)) return true;
+
+  // Split tokens for combined units e.g. "cells / cumm"
+  const tokens = normUnit.split(" ").filter((t) => t.length > 0 && t !== "/");
+  if (tokens.length > 1 && tokens.every((t) => regWithU.includes(t))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Tests whether a reference range is present in a region's normalized text.
+ */
+export function referenceMatchesInRegion(candidate: any, regionNorm: string): boolean {
+  if (!regionNorm || !candidate) return false;
+
+  const refTextNorm = normalizeForSearch(candidate.referenceText);
+  if (refTextNorm && regionNorm.includes(refTextNorm)) return true;
+
+  const lowStr = candidate.referenceLow !== null && candidate.referenceLow !== undefined ? String(candidate.referenceLow) : "";
+  const highStr = candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ? String(candidate.referenceHigh) : "";
+
+  if (lowStr && highStr) {
+    const lowIdx = regionNorm.indexOf(lowStr);
+    if (lowIdx !== -1) {
+      const windowNearLow = regionNorm.slice(Math.max(0, lowIdx - 10), lowIdx + 40);
+      if (windowNearLow.includes(highStr)) return true;
+    }
+    const highIdx = regionNorm.indexOf(highStr);
+    if (highIdx !== -1) {
+      const windowNearHigh = regionNorm.slice(Math.max(0, highIdx - 40), highIdx + 20);
+      if (windowNearHigh.includes(lowStr)) return true;
+    }
+  } else if (highStr && !lowStr) {
+    if (
+      regionNorm.includes(`< ${highStr}`) ||
+      regionNorm.includes(`<${highStr}`) ||
+      regionNorm.includes(highStr)
+    ) {
+      return true;
+    }
+  } else if (lowStr && !highStr) {
+    if (
+      regionNorm.includes(`> ${lowStr}`) ||
+      regionNorm.includes(`>${lowStr}`) ||
+      regionNorm.includes(lowStr)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Finds the anchor source region corresponding to a candidate's test name.
+ * Uses contextual row-level scoring (page, value, unit, reference range)
+ * to disambiguate repeated identical test names across sections or pages.
+ */
+export function findAnchorRegion(
+  candidate: any,
+  regions: DocumentRegion[],
+  _pages: any[],
+): (DocumentRegion & { isAmbiguousChoice?: boolean }) | null {
+  if (!candidate || !Array.isArray(regions) || regions.length === 0) return null;
+
+  const normTestName = normalizeForSearch(candidate.testName);
+  if (!normTestName || normTestName.length < 2) return null;
+
+  const testTokens = normTestName.split(" ").filter((t) => t.length > 1);
+  const specifiedPage = Number.isInteger(candidate.sourcePage) ? candidate.sourcePage : 1;
+
+  const matchingRegions: Array<{ region: DocumentRegion; score: number; hasExact: boolean }> = [];
+
+  for (const reg of regions) {
+    const hasExact = reg.normalizedText.includes(normTestName);
+    const hasTokens = testTokens.length > 0 && testTokens.every((tok) => reg.normalizedText.includes(tok));
+
+    if (hasExact || hasTokens) {
+      // Anchor must start at or contain the test name in its first line
+      const firstLineNorm = normalizeForSearch(reg.lines[0]);
+      const startsWithTest = testTokens.length > 0 && testTokens.some((tok) => firstLineNorm.includes(tok));
+      if (!startsWithTest && reg.span > 1) {
+        continue;
+      }
+
+      let score = 0;
+      // Exact test name match strongly preferred
+      if (hasExact) score += 10;
+      else score += 5;
+
+      // Target page alignment
+      if (reg.page === specifiedPage) score += 8;
+
+      // Prefer minimal span (compactness) when the region contains the test name
+      score += (5 - reg.span);
+
+      // Contextual evidence for multiple identical test names
+      if (valueMatchesInRegion(candidate.resultValue, candidate.numericValue, reg.normalizedText)) score += 4;
+      if (candidate.unit && unitMatchesInRegion(candidate.unit, reg.normalizedText)) score += 2;
+      if (referenceMatchesInRegion(candidate, reg.normalizedText)) score += 2;
+
+      matchingRegions.push({ region: reg, score, hasExact });
+    }
+  }
+
+  if (matchingRegions.length === 0) return null;
+
+  matchingRegions.sort((a, b) => b.score - a.score);
+  const top = matchingRegions[0];
+
+  if (
+    matchingRegions.length > 1 &&
+    matchingRegions[1].score === top.score &&
+    matchingRegions[1].region.page === top.region.page &&
+    matchingRegions[1].region.startLine !== top.region.startLine
+  ) {
+    return { ...top.region, isAmbiguousChoice: true };
+  }
+
+  return top.region;
+}
+
+/**
+ * Reconciles an extracted candidate against the original source OCR pages
+ * at the TEST-ROW / REGION level.
+ * 
+ * Core rule:
+ * "The extracted test name, result value, unit, and reference range must be
+ *  supported by the same logical source row/region."
+ * 
+ * Cross-row contamination (e.g. borrowing value, unit, or range from another row)
+ * is strictly rejected from being marked source_supported.
  */
 export function reconcileWithSourceOcr(
   candidate: StructuredBiomarkerCandidate,
@@ -66,134 +335,105 @@ export function reconcileWithSourceOcr(
     ambiguityReasons.push(`Specified source page ${specifiedPage} does not exist in document (document has ${numPages} pages)`);
   }
 
-  const targetPageObj = isPageValid ? pages[specifiedPage - 1] : null;
-  const targetPageText = targetPageObj ? (targetPageObj.text || "") : "";
-  const allDocText = pages.map((p) => p.text || "").join("\n");
+  // Derive logical source regions across document
+  const allRegions = buildDocumentRegions(pages, { maxSpan: 4 });
 
-  const normalizeForSearch = (str: any) =>
-    String(str || "")
-      .toLowerCase()
-      .replace(/[^\w\d.%/<>+-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  // 1. Establish anchor region for testName FIRST
+  const anchorRegion = findAnchorRegion(candidate, allRegions, pages);
 
-  const normTarget = normalizeForSearch(targetPageText);
-  const normAll = normalizeForSearch(allDocText);
-
-  // 1. Verify testName
-  const normTestName = normalizeForSearch(candidate.testName);
-  const testTokens = normTestName.split(" ").filter((t) => t.length > 1);
-
-  if (normTarget.includes(normTestName)) {
-    groundingStatus.testName = "source_supported";
-  } else if (normAll.includes(normTestName)) {
-    groundingStatus.testName = "source_supported";
-    if (isPageValid && !normTarget.includes(normTestName)) {
-      groundingStatus.testName = "partially_supported";
-      ambiguityReasons.push(`Test name "${candidate.testName}" appears on another page, not page ${specifiedPage}`);
-      isAmbiguous = true;
-    }
-  } else if (testTokens.length > 0 && testTokens.every((tok) => normTarget.includes(tok) || normAll.includes(tok))) {
-    groundingStatus.testName = "partially_supported";
-  } else {
+  if (!anchorRegion) {
     groundingStatus.testName = "unsupported";
+    groundingStatus.resultValue = "unsupported";
+    groundingStatus.unit = candidate.unit ? "unsupported" : "not_applicable";
+    groundingStatus.referenceRange = (candidate.referenceLow !== null && candidate.referenceLow !== undefined ||
+      candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ||
+      candidate.referenceText)
+      ? "unsupported"
+      : "not_applicable";
     isAmbiguous = true;
     if (!ambiguousFields.includes("testName")) ambiguousFields.push("testName");
     ambiguityReasons.push(`Test name "${candidate.testName}" is not supported by source OCR`);
+
+    candidate.flag = "unknown";
+    candidate.isAmbiguous = isAmbiguous;
+    candidate.ambiguousFields = ambiguousFields;
+    candidate.ambiguityReason = ambiguityReasons.join("; ");
+    candidate.groundingStatus = groundingStatus;
+    return candidate;
   }
 
-  // 2. Verify resultValue
-  const rawVal = String(candidate.resultValue || "").trim();
-  const cleanVal = normalizeForSearch(rawVal);
-  const numValStr = candidate.numericValue !== null && candidate.numericValue !== undefined
-    ? String(candidate.numericValue)
-    : "";
-  const commaFormatted = numValStr.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-  const valueMatchesInText = (text: string) => {
-    if (!text) return false;
-    const norm = normalizeForSearch(text);
-    if (cleanVal && norm.includes(cleanVal)) return true;
-    if (numValStr && norm.includes(numValStr)) return true;
-    if (commaFormatted && norm.includes(normalizeForSearch(commaFormatted))) return true;
-    if (numValStr.includes(".")) {
-      const commaDecimal = numValStr.replace(".", ",");
-      if (norm.includes(commaDecimal)) return true;
-    }
-    return false;
+  // Record anchor region provenance
+  candidate.sourceRegion = {
+    page: anchorRegion.page,
+    startLine: anchorRegion.startLine,
+    endLine: anchorRegion.endLine,
+    text: anchorRegion.text.trim(),
   };
 
-  const targetHasVal = valueMatchesInText(targetPageText);
-  const allHasVal = valueMatchesInText(allDocText);
-
-  if (targetHasVal) {
-    groundingStatus.resultValue = "source_supported";
-  } else if (allHasVal) {
-    groundingStatus.resultValue = "partially_supported";
-    ambiguityReasons.push(`Result value "${rawVal}" found on a different page than page ${specifiedPage}`);
+  if (anchorRegion.isAmbiguousChoice) {
+    groundingStatus.testName = "source_ambiguous";
     isAmbiguous = true;
-    if (!ambiguousFields.includes("resultValue")) ambiguousFields.push("resultValue");
+    if (!ambiguousFields.includes("testName")) ambiguousFields.push("testName");
+    ambiguityReasons.push(`Multiple identical test name regions found with ambiguous association`);
+  } else if (anchorRegion.span > 1) {
+    groundingStatus.testName = "partially_supported";
+  } else {
+    groundingStatus.testName = "source_supported";
+  }
+
+  if (anchorRegion.page !== specifiedPage && isPageValid) {
+    groundingStatus.testName = "partially_supported";
+    ambiguityReasons.push(`Test name "${candidate.testName}" appears on page ${anchorRegion.page}, not page ${specifiedPage}`);
+    isAmbiguous = true;
+  }
+
+  const regionNorm = anchorRegion.normalizedText;
+
+  // 2. Validate resultValue strictly against the anchor test-row region
+  const rawVal = String(candidate.resultValue || "").trim();
+  const valInAnchor = valueMatchesInRegion(candidate.resultValue, candidate.numericValue, regionNorm);
+
+  if (valInAnchor) {
+    groundingStatus.resultValue = "source_supported";
   } else {
     groundingStatus.resultValue = "unsupported";
     isAmbiguous = true;
     if (!ambiguousFields.includes("resultValue")) ambiguousFields.push("resultValue");
-    ambiguityReasons.push(`Result value "${rawVal}" is not supported by source OCR on page ${specifiedPage}`);
+    ambiguityReasons.push(
+      `Result value "${rawVal}" is not supported by source OCR in the test row region (page ${anchorRegion.page}, lines ${anchorRegion.startLine}-${anchorRegion.endLine})`
+    );
   }
 
-  // 3. Verify unit
+  // 3. Validate unit strictly against the anchor test-row region
   if (candidate.unit && candidate.unit.trim().length > 0) {
-    const normUnit = normalizeForSearch(candidate.unit).replace(/µ/g, "u");
-    const docWithU = normAll.replace(/µ/g, "u");
-    if (docWithU.includes(normUnit)) {
+    const unitInAnchor = unitMatchesInRegion(candidate.unit, regionNorm);
+    if (unitInAnchor) {
       groundingStatus.unit = "source_supported";
     } else {
       groundingStatus.unit = "unsupported";
       isAmbiguous = true;
       if (!ambiguousFields.includes("unit")) ambiguousFields.push("unit");
-      ambiguityReasons.push(`Unit "${candidate.unit}" is not supported by source OCR`);
+      ambiguityReasons.push(`Unit "${candidate.unit}" is not supported by source OCR in the test row region`);
     }
   } else {
     groundingStatus.unit = "not_applicable";
   }
 
-  // 4. Verify referenceRange
+  // 4. Validate referenceRange strictly against the anchor test-row region
   const hasRefBounds = candidate.referenceLow !== null && candidate.referenceLow !== undefined ||
     candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ||
     (candidate.referenceText && candidate.referenceText.trim().length > 0);
   if (hasRefBounds) {
-    const refTextNorm = normalizeForSearch(candidate.referenceText);
-    const lowStr = candidate.referenceLow !== null && candidate.referenceLow !== undefined ? String(candidate.referenceLow) : "";
-    const highStr = candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ? String(candidate.referenceHigh) : "";
-
-    let refSupported = false;
-    if (refTextNorm && normAll.includes(refTextNorm)) {
-      refSupported = true;
-    } else if (lowStr && highStr) {
-      // Both bounds specified: must appear in close proximity (within 35 chars) in source text
-      const lowIdx = normAll.indexOf(lowStr);
-      if (lowIdx !== -1) {
-        const textNearLow = normAll.slice(Math.max(0, lowIdx - 10), lowIdx + 40);
-        if (textNearLow.includes(highStr)) {
-          refSupported = true;
-        }
-      }
-    } else if (highStr && !lowStr) {
-      if (normAll.includes(`< ${highStr}`) || normAll.includes(`<${highStr}`) || normAll.includes(highStr)) {
-        refSupported = true;
-      }
-    } else if (lowStr && !highStr) {
-      if (normAll.includes(`> ${lowStr}`) || normAll.includes(`>${lowStr}`) || normAll.includes(lowStr)) {
-        refSupported = true;
-      }
-    }
-
-    if (refSupported) {
+    const refInAnchor = referenceMatchesInRegion(candidate, regionNorm);
+    if (refInAnchor) {
       groundingStatus.referenceRange = "source_supported";
     } else {
       groundingStatus.referenceRange = "unsupported";
       isAmbiguous = true;
       if (!ambiguousFields.includes("referenceRange")) ambiguousFields.push("referenceRange");
-      ambiguityReasons.push(`Reference range "${candidate.referenceText || `${candidate.referenceLow}-${candidate.referenceHigh}`}" is not supported by source OCR`);
+      ambiguityReasons.push(
+        `Reference range "${candidate.referenceText || `${candidate.referenceLow}-${candidate.referenceHigh}`}" is not supported by source OCR in the test row region`
+      );
     }
   } else {
     groundingStatus.referenceRange = "not_applicable";
@@ -242,7 +482,7 @@ export function reconcileWithSourceOcr(
     }
   } else {
     const printedIndicatorRegex = /\b(high|low|abnormal|\*|\(h\)|\(l\))\b/i;
-    const hasPrintedIndicator = printedIndicatorRegex.test(targetPageText);
+    const hasPrintedIndicator = printedIndicatorRegex.test(regionNorm);
 
     if (hasPrintedIndicator && (rawFlag === "high" || rawFlag === "low" || rawFlag === "abnormal")) {
       resolvedFlag = rawFlag as any;
@@ -251,12 +491,12 @@ export function reconcileWithSourceOcr(
       resolvedFlag = "unknown";
       isAmbiguous = true;
       if (!ambiguousFields.includes("flag")) ambiguousFields.push("flag");
-      ambiguityReasons.push(`Flag "${rawFlag}" lacks supporting reference range or printed flag in source document`);
+      ambiguityReasons.push(`Flag "${rawFlag}" lacks supporting reference range or printed flag in the test row region`);
       groundingStatus.flag = "unsupported";
-    } else if (/positive|reactive|present/i.test(candidate.resultValue)) {
+    } else if (/positive|reactive|present/i.test(candidate.resultValue) && regionNorm.includes(normalizeForSearch(candidate.resultValue))) {
       resolvedFlag = "abnormal";
       groundingStatus.flag = "source_supported";
-    } else if (/negative|non-reactive|absent|nil/i.test(candidate.resultValue)) {
+    } else if (/negative|non-reactive|absent|nil/i.test(candidate.resultValue) && regionNorm.includes(normalizeForSearch(candidate.resultValue))) {
       resolvedFlag = "normal";
       groundingStatus.flag = "source_supported";
     } else {

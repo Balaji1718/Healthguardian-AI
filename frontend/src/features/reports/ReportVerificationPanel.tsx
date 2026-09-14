@@ -456,6 +456,7 @@ export function ReportVerificationPanel({
                     {c.sourcePage && (
                       <span className="text-[10px] text-muted-foreground/70">
                         Page {c.sourcePage}
+                        {c.sourceRegion?.startLine ? ` • Line ${c.sourceRegion.startLine}${c.sourceRegion.endLine && c.sourceRegion.endLine !== c.sourceRegion.startLine ? `-${c.sourceRegion.endLine}` : ""}` : ""}
                       </span>
                     )}
                   </div>

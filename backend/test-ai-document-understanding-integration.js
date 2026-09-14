@@ -552,6 +552,255 @@ Haemoglobin  14.2  g/dL  13.0 - 17.0
   assert("Completely ungrounded row rejected completely", !outcome16.results.some((r) => r.testName === "CompletelyInventedGeneX"));
   assert("Ungrounded rejection recorded in excludedMetadata", outcome16.excludedMetadata.some((m) => m.includes("CompletelyInventedGeneX")));
 
+  // ------------------------------------------------------------------
+  // SCENARIO 17: Cross-Row Contamination - Value from Another Row
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 17: Cross-Row Contamination - Value from Another Row]");
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Haemoglobin",
+          resultValue: "11,800", // Value belongs to WBC, NOT Haemoglobin
+          numericValue: 11800,
+          unit: "g/dL",
+          referenceLow: 13.0,
+          referenceHigh: 17.0,
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome17 = await understandMedicalDocument(realisticTwoPageDoc);
+  assert("Cross-row value marked isAmbiguous: true", outcome17.results[0].isAmbiguous === true);
+  assert("Cross-row value: ambiguousFields includes resultValue", outcome17.results[0].ambiguousFields?.includes("resultValue"));
+  assert("Cross-row value: groundingStatus.resultValue is unsupported", outcome17.results[0].groundingStatus?.resultValue === "unsupported");
+  assert("Cross-row value: anchor sourceRegion belongs to Haemoglobin row", outcome17.results[0].sourceRegion?.text.includes("Haemoglobin"));
+
+  // ------------------------------------------------------------------
+  // SCENARIO 18: Cross-Row Contamination - Unit from Another Row / Page
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 18: Cross-Row Contamination - Unit from Another Row]");
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Haemoglobin",
+          resultValue: "14.2",
+          numericValue: 14.2,
+          unit: "mg/dL", // mg/dL appears on Page 2, NOT in Haemoglobin's row
+          referenceLow: 13.0,
+          referenceHigh: 17.0,
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome18 = await understandMedicalDocument(realisticTwoPageDoc);
+  assert("Cross-row unit marked isAmbiguous: true", outcome18.results[0].isAmbiguous === true);
+  assert("Cross-row unit: ambiguousFields includes unit", outcome18.results[0].ambiguousFields?.includes("unit"));
+  assert("Cross-row unit: groundingStatus.unit is unsupported", outcome18.results[0].groundingStatus?.unit === "unsupported");
+
+  // ------------------------------------------------------------------
+  // SCENARIO 19: Cross-Row Contamination - Reference Range from Another Row
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 19: Cross-Row Contamination - Reference Range from Another Row]");
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Haemoglobin",
+          resultValue: "14.2",
+          numericValue: 14.2,
+          unit: "g/dL",
+          referenceLow: 4000,
+          referenceHigh: 11000,
+          referenceText: "4,000 - 11,000", // Belongs to WBC row
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome19 = await understandMedicalDocument(realisticTwoPageDoc);
+  assert("Cross-row ref range marked isAmbiguous: true", outcome19.results[0].isAmbiguous === true);
+  assert("Cross-row ref range: ambiguousFields includes referenceRange", outcome19.results[0].ambiguousFields?.includes("referenceRange"));
+  assert("Cross-row ref range: groundingStatus.referenceRange is unsupported", outcome19.results[0].groundingStatus?.referenceRange === "unsupported");
+
+  // ------------------------------------------------------------------
+  // SCENARIO 20: Mixed Cross-Row Contamination - All Fields From Unrelated Rows
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 20: Mixed Cross-Row Contamination]");
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Haemoglobin", // Row 1
+          resultValue: "238", // Row from Cholesterol
+          numericValue: 238,
+          unit: "cells/cumm", // Row from WBC
+          referenceText: "< 200", // Row from Cholesterol
+          referenceHigh: 200,
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome20 = await understandMedicalDocument(realisticTwoPageDoc);
+  assert("Mixed contamination marked isAmbiguous: true", outcome20.results[0].isAmbiguous === true);
+  assert("Mixed contamination: resultValue unsupported", outcome20.results[0].groundingStatus?.resultValue === "unsupported");
+  assert("Mixed contamination: unit unsupported", outcome20.results[0].groundingStatus?.unit === "unsupported");
+  assert("Mixed contamination: referenceRange unsupported", outcome20.results[0].groundingStatus?.referenceRange === "unsupported");
+  assert("Mixed contamination: ambiguousFields has multiple contaminated fields", outcome20.results[0].ambiguousFields?.length >= 3);
+
+  // ------------------------------------------------------------------
+  // SCENARIO 21: Multi-Line Wrapped Row Association
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 21: Multi-Line Wrapped Row Association]");
+  const multiLineDoc = [
+    {
+      page: 1,
+      confidence: 0.95,
+      text: `
+LABORATORY REPORT
+Total
+Cholesterol
+238 mg/dL
+< 200
+      `,
+    },
+  ];
+
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Total Cholesterol",
+          resultValue: "238",
+          numericValue: 238,
+          unit: "mg/dL",
+          referenceHigh: 200,
+          referenceText: "< 200",
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome21 = await understandMedicalDocument(multiLineDoc);
+  assert("Multi-line row anchor established", outcome21.results.length === 1);
+  assert("Multi-line row value source_supported", outcome21.results[0].groundingStatus?.resultValue === "source_supported");
+  assert("Multi-line row unit source_supported", outcome21.results[0].groundingStatus?.unit === "source_supported");
+  assert("Multi-line row referenceRange source_supported", outcome21.results[0].groundingStatus?.referenceRange === "source_supported");
+  assert("Multi-line row sourceRegion captures multi-line span", outcome21.results[0].sourceRegion?.endLine > outcome21.results[0].sourceRegion?.startLine);
+
+  // ------------------------------------------------------------------
+  // SCENARIO 22: Repeated Test Names Disambiguated by Contextual Evidence
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 22: Repeated Test Name Disambiguation]");
+  const repeatedTestDoc = [
+    {
+      page: 1,
+      text: `Glucose   95   mg/dL   70 - 100`,
+    },
+    {
+      page: 2,
+      text: `Glucose   140  mg/dL   70 - 140`,
+    },
+  ];
+
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Glucose",
+          resultValue: "95",
+          numericValue: 95,
+          unit: "mg/dL",
+          sourcePage: 1,
+        },
+        {
+          testName: "Glucose",
+          resultValue: "140",
+          numericValue: 140,
+          unit: "mg/dL",
+          sourcePage: 2,
+        },
+      ],
+    }),
+  }));
+
+  const outcome22 = await understandMedicalDocument(repeatedTestDoc);
+  assert("Candidate 1 anchored to Page 1", outcome22.results[0].sourceRegion?.page === 1);
+  assert("Candidate 1 value 95 supported on Page 1", outcome22.results[0].groundingStatus?.resultValue === "source_supported");
+  assert("Candidate 2 anchored to Page 2", outcome22.results[1].sourceRegion?.page === 2);
+  assert("Candidate 2 value 140 supported on Page 2", outcome22.results[1].groundingStatus?.resultValue === "source_supported");
+
+  // ------------------------------------------------------------------
+  // SCENARIO 23: Global Unit Contamination Defense (Identical Unit across many tests)
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 23: Identical Unit Global Contamination Defense]");
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Packed Cell Volume (PCV)", // On Page 1 with unit '%'
+          resultValue: "42.5",
+          numericValue: 42.5,
+          unit: "mg/dL", // mg/dL is everywhere on Page 2, but NOT in PCV row
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome23 = await understandMedicalDocument(realisticTwoPageDoc);
+  assert("PCV with borrowed mg/dL marked isAmbiguous: true", outcome23.results[0].isAmbiguous === true);
+  assert("PCV unit marked unsupported despite mg/dL existing elsewhere", outcome23.results[0].groundingStatus?.unit === "unsupported");
+
+  // ------------------------------------------------------------------
+  // SCENARIO 24: Equal Ambiguity Detection for Identical Plausible Regions
+  // ------------------------------------------------------------------
+  console.log("\n[SCENARIO 24: Equal Ambiguity Detection]");
+  const ambiguousRepeatedDoc = [
+    {
+      page: 1,
+      text: `
+Line 1: Serum Calcium 9.2 mg/dL 8.5 - 10.5
+Line 2: Other Test 50 U/L
+Line 3: Serum Calcium 9.2 mg/dL 8.5 - 10.5
+      `,
+    },
+  ];
+
+  setTestCompletionRouter(async () => ({
+    ok: true,
+    content: JSON.stringify({
+      results: [
+        {
+          testName: "Serum Calcium",
+          resultValue: "9.2",
+          unit: "mg/dL",
+          sourcePage: 1,
+        },
+      ],
+    }),
+  }));
+
+  const outcome24 = await understandMedicalDocument(ambiguousRepeatedDoc);
+  assert("Identical equally-plausible rows flagged as source_ambiguous", outcome24.results[0].groundingStatus?.testName === "source_ambiguous");
+  assert("Ambiguous choice marks row isAmbiguous: true", outcome24.results[0].isAmbiguous === true);
+
   // Clean up mock router
   clearTestCompletionRouter();
 
