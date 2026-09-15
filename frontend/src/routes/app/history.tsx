@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   CartesianGrid,
   Line,
@@ -42,7 +42,7 @@ export function History() {
   const uid = useUid();
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useCheckins(uid, 120);
-  const { data: healthRecordsData, isLoading: isLoadingRecords } = useHealthRecords(uid, undefined, 200);
+  const { data: healthRecordsData, isLoading: isLoadingRecords, isError: isErrorRecords, refetch: refetchRecords } = useHealthRecords(uid, undefined, 200);
 
   const [activeTab, setActiveTab] = useState<"checkins" | "biomarkers">("checkins");
   const [selectedBiomarker, setSelectedBiomarker] = useState<string>("all");
@@ -50,16 +50,31 @@ export function History() {
     "sleepHours" | "waterGlasses" | "exerciseMinutes" | "weightKg" | "systolicBP" | "bloodGlucose"
   >("sleepHours");
 
-  if (isLoading) return <LoadingState label={t("common.loading")} />;
-  if (isError) return <ErrorState onRetry={() => void refetch()} />;
+  if (isLoading || isLoadingRecords) return <LoadingState label={t("common.loading")} />;
+  if (isError || isErrorRecords) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          void refetch();
+          void refetchRecords();
+        }}
+      />
+    );
+  }
 
-  const checkins = data ?? [];
+  const checkins = (data ?? []).filter((c) => Boolean(c && typeof c === "object"));
   const points = [...checkins]
     .reverse()
-    .map((c) => ({
-      date: toDate(c.date)?.toLocaleDateString(undefined, { month: "short", day: "numeric" }) ?? "",
-      value: c[metric] ?? null,
-    }))
+    .map((c) => {
+      const d = c?.date ? toDate(c.date) : null;
+      const formattedDate = d instanceof Date && !isNaN(d.getTime())
+        ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        : "";
+      return {
+        date: formattedDate,
+        value: typeof c[metric] === "number" ? c[metric] : null,
+      };
+    })
     .filter((p) => typeof p.value === "number");
 
   const metrics = [
@@ -72,7 +87,7 @@ export function History() {
   ] as const;
 
   const labRecords = useMemo(() => {
-    return (healthRecordsData ?? []).filter((r) => r.sourceType === "medical_report");
+    return (healthRecordsData ?? []).filter((r) => Boolean(r && r.sourceType === "medical_report" && r.metric));
   }, [healthRecordsData]);
 
   const uniqueBiomarkers = useMemo(() => {
@@ -88,10 +103,16 @@ export function History() {
     if (selectedBiomarker === "all") return [];
     return [...filteredLabRecords]
       .reverse()
-      .map((r) => ({
-        date: toDate(r.recordedAt)?.toLocaleDateString(undefined, { month: "short", day: "numeric" }) ?? "",
-        value: r.numericValue ?? null,
-      }))
+      .map((r) => {
+        const d = r?.recordedAt ? toDate(r.recordedAt) : null;
+        const formattedDate = d instanceof Date && !isNaN(d.getTime())
+          ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+          : "";
+        return {
+          date: formattedDate,
+          value: typeof r?.numericValue === "number" ? r.numericValue : null,
+        };
+      })
       .filter((p) => typeof p.value === "number");
   }, [filteredLabRecords, selectedBiomarker]);
 

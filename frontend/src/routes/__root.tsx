@@ -49,15 +49,23 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportRuntimeError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  const pageLoadErrorText = t("common.pageLoadError");
+  const pageLoadErrorDescText = t("common.pageLoadErrorDesc");
+  const retryText = t("common.retry");
+  const goHomeText = t("common.goHome");
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {t("common.pageLoadError") || "This page didn't load"}
+          {pageLoadErrorText && pageLoadErrorText !== "common.pageLoadError"
+            ? pageLoadErrorText
+            : "This page didn't load"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {t("common.pageLoadErrorDesc") ||
-            "Something went wrong on our end. You can try refreshing or head back home."}
+          {pageLoadErrorDescText && pageLoadErrorDescText !== "common.pageLoadErrorDesc"
+            ? pageLoadErrorDescText
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -65,15 +73,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 cursor-pointer"
           >
-            {t("common.retry") || "Try again"}
+            {retryText && retryText !== "common.retry" ? retryText : "Try again"}
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            {t("common.goHome") || "Go home"}
+            {goHomeText && goHomeText !== "common.goHome" ? goHomeText : "Go home"}
           </a>
         </div>
       </div>

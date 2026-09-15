@@ -204,6 +204,9 @@ export function ConnectedFolderPanel({
         newCount,
       }));
 
+      // Reset page to 1 so newly discovered files (sorted to top) are immediately visible
+      setCurrentPage(1);
+
       // Reconcile selected filenames: purge any that no longer exist
       const existingNames = new Set(files.map((f) => f.name));
       setSelectedFilenames((prev) => prev.filter((name) => existingNames.has(name)));

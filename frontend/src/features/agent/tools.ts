@@ -241,7 +241,7 @@ export const TOOLS: ToolDefinition[] = [
         reference: r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
         flag: r.flag || "normal",
         page: r.sourcePage ?? 1,
-        date: r.verifiedAt ? r.verifiedAt.toISOString().slice(0, 10) : undefined,
+        date: r.verifiedAt ? toDate(r.verifiedAt)?.toISOString().slice(0, 10) : undefined,
       }));
       return {
         ok: true,

@@ -2,6 +2,16 @@ import type { MedicalResult } from "@/models";
 
 export type AmbiguousFieldType = "testName" | "resultValue" | "unit" | "referenceRange" | "flag";
 
+export interface GroundingStatusRecord {
+  testName?: string;
+  resultValue?: string;
+  unit?: string;
+  referenceRange?: string;
+  flag?: string;
+  sourcePageValid?: string;
+  overall?: string;
+}
+
 export interface StructuredBiomarkerCandidate extends Omit<MedicalResult, "userVerified"> {
   userVerified: boolean;
   section?: string;
@@ -9,20 +19,26 @@ export interface StructuredBiomarkerCandidate extends Omit<MedicalResult, "userV
   isAmbiguous?: boolean;
   ambiguityReason?: string;
   ambiguousFields?: AmbiguousFieldType[];
-  groundingStatus?: Record<string, string>;
+  groundingStatus?: GroundingStatusRecord;
+  sourceRegion?: {
+    page: number;
+    startLine: number;
+    endLine: number;
+    text?: string;
+  };
 }
 
 export interface DocumentUnderstandingResult {
   ok: boolean;
-  reportTitle?: string;
-  laboratoryName?: string | null;
-  reportDate?: string | null;
-  sections?: string[];
+  reportTitle?: string | null | undefined;
+  laboratoryName?: string | null | undefined;
+  reportDate?: string | null | undefined;
+  sections?: string[] | undefined;
   candidates: StructuredBiomarkerCandidate[];
-  excludedMetadata?: string[];
-  warnings?: string[];
-  provider?: string;
-  error?: string;
+  excludedMetadata?: string[] | undefined;
+  warnings?: string[] | undefined;
+  provider?: string | undefined;
+  error?: string | undefined;
 }
 
 export interface DocumentRegion {
@@ -73,7 +89,7 @@ export function buildDocumentRegions(
     const lineEntries: Array<{ lineIndex: number; rawText: string; normalizedText: string; hasNumber: boolean }> = [];
 
     for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
-      const lineStr = rawLines[lIdx].trim();
+      const lineStr = (rawLines[lIdx] ?? "").trim();
       if (lineStr.length > 0) {
         const hasNumber = /\d+(?:\.\d+)?/.test(lineStr);
         lineEntries.push({
@@ -97,8 +113,9 @@ export function buildDocumentRegions(
           for (let k = 1; k < spanLines.length; k++) {
             const prevLine = spanLines[k - 1];
             const currLine = spanLines[k];
+            if (!prevLine || !currLine) continue;
             const prevHasNum = prevLine.hasNumber;
-            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|\<|\>)/i.test(currLine.rawText);
+            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|negative|positive|reactive|non-reactive|non\s*reactive|trace|nil|absent|cutoff|cut-off|borderline|equivocal|odratio|index|method|interpretation|result|\<|\>)/i.test(currLine.rawText);
             const currHasWordsAndNum = /[a-zA-Z]{3,}/.test(currLine.rawText) && currLine.hasNumber;
             if (prevHasNum && currHasWordsAndNum && !isRefContinuation) {
               hasCrossRowMerge = true;
@@ -111,8 +128,10 @@ export function buildDocumentRegions(
         }
 
         const combinedText = spanLines.map((l) => l.rawText).join(" ");
-        const startLine = spanLines[0].lineIndex;
-        const endLine = spanLines[spanLines.length - 1].lineIndex;
+        const firstSpan = spanLines[0];
+        const lastSpan = spanLines[spanLines.length - 1];
+        const startLine = firstSpan?.lineIndex ?? (i + 1);
+        const endLine = lastSpan?.lineIndex ?? (i + span);
 
         regions.push({
           id: `p${pageNum}_L${startLine}${span > 1 ? `-${endLine}` : ""}`,
@@ -169,6 +188,16 @@ export function unitMatchesInRegion(unitStr: any, regionNorm: string): boolean {
   const regWithU = regionNorm.replace(/µ/g, "u");
   if (regWithU.includes(normUnit)) return true;
 
+  // Space-collapsed matching (e.g. "od ratio" vs "odratio")
+  const collapsedUnit = normUnit.replace(/\s+/g, "");
+  const collapsedRegion = regWithU.replace(/\s+/g, "");
+  if (collapsedUnit.length > 1 && collapsedRegion.includes(collapsedUnit)) return true;
+
+  // OCR letter-zero confusion (e.g. "0dratio" vs "odratio")
+  const oReplacedUnit = collapsedUnit.replace(/0/g, "o");
+  const oReplacedRegion = collapsedRegion.replace(/0/g, "o");
+  if (oReplacedUnit.length > 1 && oReplacedRegion.includes(oReplacedUnit)) return true;
+
   // Split tokens for combined units e.g. "cells / cumm"
   const tokens = normUnit.split(" ").filter((t) => t.length > 0 && t !== "/");
   if (tokens.length > 1 && tokens.every((t) => regWithU.includes(t))) {
@@ -180,12 +209,63 @@ export function unitMatchesInRegion(unitStr: any, regionNorm: string): boolean {
 
 /**
  * Tests whether a reference range is present in a region's normalized text.
+ * Distinguishes numeric intervals, upper/lower thresholds, and qualitative references.
  */
 export function referenceMatchesInRegion(candidate: any, regionNorm: string): boolean {
   if (!regionNorm || !candidate) return false;
 
-  const refTextNorm = normalizeForSearch(candidate.referenceText);
+  const rawRef = String(candidate.referenceText || "").trim();
+  const refTextNorm = normalizeForSearch(rawRef);
   if (refTextNorm && regionNorm.includes(refTextNorm)) return true;
+
+  // Space-collapsed matching
+  const noSpaceRef = refTextNorm.replace(/\s+/g, "");
+  const noSpaceRegion = regionNorm.replace(/\s+/g, "");
+  if (noSpaceRef.length > 2 && noSpaceRegion.includes(noSpaceRef)) return true;
+
+  // Qualitative reference patterns & abbreviations
+  if (/negative|non-?reactive|absent|nil/i.test(rawRef)) {
+    if (
+      /\b(?:neg|negative|non-?reactive|nil|absent|-ve|\(-ve\)|[-–]ve)\b/i.test(regionNorm) ||
+      regionNorm.includes("negative") ||
+      regionNorm.includes("neg") ||
+      regionNorm.includes("non reactive") ||
+      regionNorm.includes("nonreactive")
+    ) {
+      return true;
+    }
+  }
+
+  if (/positive|reactive|present/i.test(rawRef)) {
+    if (
+      /\b(?:pos|positive|reactive|present|\+ve|\(\+ve\)|\+)\b/i.test(regionNorm) ||
+      regionNorm.includes("positive") ||
+      regionNorm.includes("pos") ||
+      regionNorm.includes("reactive")
+    ) {
+      return true;
+    }
+  }
+
+  if (/normal/i.test(rawRef)) {
+    if (/\b(?:normal|norm)\b/i.test(regionNorm) || regionNorm.includes("normal")) {
+      return true;
+    }
+  }
+
+  // Threshold e.g. "< 1.0" or "<= 1.0" or "<1.00"
+  const thresholdMatch = /([<>]=?)\s*(\d+(?:\.\d+)?)/.exec(rawRef);
+  if (thresholdMatch) {
+    const sym = thresholdMatch[1];
+    const val = thresholdMatch[2];
+    if (
+      (sym && val && regionNorm.includes(`${sym} ${val}`)) ||
+      (sym && val && regionNorm.includes(`${sym}${val}`)) ||
+      (val && regionNorm.includes(val))
+    ) {
+      return true;
+    }
+  }
 
   const lowStr = candidate.referenceLow !== null && candidate.referenceLow !== undefined ? String(candidate.referenceLow) : "";
   const highStr = candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ? String(candidate.referenceHigh) : "";
@@ -248,7 +328,8 @@ export function findAnchorRegion(
 
     if (hasExact || hasTokens) {
       // Anchor must start at or contain the test name in its first line
-      const firstLineNorm = normalizeForSearch(reg.lines[0]);
+      const firstLineText = reg.lines[0] ?? "";
+      const firstLineNorm = normalizeForSearch(firstLineText);
       const startsWithTest = testTokens.length > 0 && testTokens.some((tok) => firstLineNorm.includes(tok));
       if (!startsWithTest && reg.span > 1) {
         continue;
@@ -268,7 +349,7 @@ export function findAnchorRegion(
       // Contextual evidence for multiple identical test names
       if (valueMatchesInRegion(candidate.resultValue, candidate.numericValue, reg.normalizedText)) score += 4;
       if (candidate.unit && unitMatchesInRegion(candidate.unit, reg.normalizedText)) score += 2;
-      if (referenceMatchesInRegion(candidate, reg.normalizedText)) score += 2;
+      if (referenceMatchesInRegion(candidate, reg.normalizedText)) score += 3;
 
       matchingRegions.push({ region: reg, score, hasExact });
     }
@@ -278,12 +359,14 @@ export function findAnchorRegion(
 
   matchingRegions.sort((a, b) => b.score - a.score);
   const top = matchingRegions[0];
+  if (!top) return null;
 
+  const second = matchingRegions[1];
   if (
-    matchingRegions.length > 1 &&
-    matchingRegions[1].score === top.score &&
-    matchingRegions[1].region.page === top.region.page &&
-    matchingRegions[1].region.startLine !== top.region.startLine
+    second &&
+    second.score === top.score &&
+    second.region.page === top.region.page &&
+    second.region.startLine !== top.region.startLine
   ) {
     return { ...top.region, isAmbiguousChoice: true };
   }

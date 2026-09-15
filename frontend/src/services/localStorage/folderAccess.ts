@@ -144,11 +144,11 @@ export async function getDirectoryEntries(
   handle: FileSystemDirectoryHandle,
 ): Promise<FileSystemHandle[]> {
   const items: FileSystemHandle[] = [];
+  const handleAny = handle as any;
 
-  if (typeof handle.values === "function") {
+  if (typeof handleAny.values === "function") {
     try {
-      // @ts-expect-error values() iterator is standard in Chromium
-      for await (const entry of handle.values()) {
+      for await (const entry of handleAny.values()) {
         items.push(entry);
       }
       return items;
@@ -157,10 +157,9 @@ export async function getDirectoryEntries(
     }
   }
 
-  if (typeof handle.entries === "function") {
+  if (typeof handleAny.entries === "function") {
     try {
-      // @ts-expect-error entries() iterator
-      for await (const [, entry] of handle.entries()) {
+      for await (const [, entry] of handleAny.entries()) {
         items.push(entry);
       }
       return items;
@@ -256,7 +255,7 @@ export async function scanFolderFiles(
             lastModified: Date.now(),
             type: "application/octet-stream",
             isSupported: isFileSupported(entry.name),
-            isNew: false,
+            isNew: !knownMeta.has(entry.name),
             isChanged: false,
             fileHandle,
           });
@@ -266,6 +265,14 @@ export async function scanFolderFiles(
   } catch (err) {
     console.error("Error reading directory contents:", err);
   }
+
+  // Sort canonical entries deterministically: newly discovered first, then most recently modified, then alphabetical
+  entries.sort((a, b) => {
+    if (a.isNew && !b.isNew) return -1;
+    if (!a.isNew && b.isNew) return 1;
+    if (b.lastModified !== a.lastModified) return b.lastModified - a.lastModified;
+    return a.name.localeCompare(b.name);
+  });
 
   // Count and clean up removed files from metadata
   let removedCount = 0;
