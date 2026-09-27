@@ -198,7 +198,8 @@ export function VoiceRecorderWaveform({ onTranscriptReady, onCancel }: VoiceReco
               Voice check-in is not supported in this browser
             </h4>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              This browser (such as Firefox or restricted WebViews) does not provide the Web Speech API. You can describe your day naturally in the check-in box instead.
+              This browser (such as Firefox or restricted WebViews) does not provide the Web Speech
+              API. You can describe your day naturally in the check-in box instead.
             </p>
           </div>
         </div>

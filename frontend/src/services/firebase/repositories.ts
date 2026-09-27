@@ -213,18 +213,22 @@ async function syncCheckinToHealthRecords(
   ];
   const batch = writeBatch(getDb());
   for (const [metric, value, unit] of metrics) {
-    if (value === undefined || value === null || Number.isNaN(value)) continue;
-    // Deterministic id => re-saving a check-in updates instead of duplicating.
     const ref = doc(recordsCol(uid), `${checkinId}_${metric}`);
-    batch.set(ref, {
-      metric,
-      numericValue: value,
-      unit,
-      sourceType: "daily_checkin",
-      sourceId: checkinId,
-      recordedAt: Timestamp.fromDate(date),
-      createdAt: serverTimestamp(),
-    });
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      // Deterministic record is purged if the metric was cleared to prevent stale records
+      batch.delete(ref);
+    } else {
+      // Deterministic id => re-saving a check-in updates instead of duplicating.
+      batch.set(ref, {
+        metric,
+        numericValue: value,
+        unit,
+        sourceType: "daily_checkin",
+        sourceId: checkinId,
+        recordedAt: Timestamp.fromDate(date),
+        createdAt: serverTimestamp(),
+      });
+    }
   }
   await batch.commit();
 }
@@ -331,23 +335,26 @@ export async function syncReportToHealthRecords(
     if (!r.userVerified) continue;
     const safeMetricKey = r.testName.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
     const ref = doc(recordsCol(uid), `${reportId}_${safeMetricKey}`);
-    batch.set(ref, clean({
-      metric: r.testName,
-      numericValue: r.numericValue ?? null,
-      valueText: r.resultValue,
-      unit: r.unit ?? "",
-      referenceLow: r.referenceLow ?? null,
-      referenceHigh: r.referenceHigh ?? null,
-      referenceText: r.referenceText ?? "",
-      flag: r.flag ?? "normal",
-      sourceType: "medical_report",
-      sourceId: reportId,
-      sourceName: reportTitle || "Medical Report",
-      sourcePage: r.sourcePage ?? 1,
-      userVerified: true,
-      recordedAt: Timestamp.fromDate(reportDate),
-      createdAt: serverTimestamp(),
-    }));
+    batch.set(
+      ref,
+      clean({
+        metric: r.testName,
+        numericValue: r.numericValue ?? null,
+        valueText: r.resultValue,
+        unit: r.unit ?? "",
+        referenceLow: r.referenceLow ?? null,
+        referenceHigh: r.referenceHigh ?? null,
+        referenceText: r.referenceText ?? "",
+        flag: r.flag ?? "normal",
+        sourceType: "medical_report",
+        sourceId: reportId,
+        sourceName: reportTitle || "Medical Report",
+        sourcePage: r.sourcePage ?? 1,
+        userVerified: true,
+        recordedAt: Timestamp.fromDate(reportDate),
+        createdAt: serverTimestamp(),
+      }),
+    );
   }
   await batch.commit();
 }

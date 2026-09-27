@@ -102,7 +102,10 @@ export function ReportVerificationPanel({
   const saveEdit = () => {
     if (editingIndex === null || !editDraft) return;
     const original = candidates[editingIndex]!;
-    const cleanNum = editDraft.resultValue.replace(/,/g, "").replace(/^[<>]=?\s*/, "").trim();
+    const cleanNum = editDraft.resultValue
+      .replace(/,/g, "")
+      .replace(/^[<>]=?\s*/, "")
+      .trim();
     const num = /^-?\d+(\.\d+)?$/.test(cleanNum) ? Number.parseFloat(cleanNum) : null;
 
     // Field-level ambiguity resolution: only clear ambiguity for fields that were actually edited/corrected
@@ -110,10 +113,16 @@ export function ReportVerificationPanel({
       ? [...original.ambiguousFields]
       : [];
 
-    if (editDraft.testName.trim() !== original.testName.trim() && editDraft.testName.trim().length >= 2) {
+    if (
+      editDraft.testName.trim() !== original.testName.trim() &&
+      editDraft.testName.trim().length >= 2
+    ) {
       remainingAmbiguousFields = remainingAmbiguousFields.filter((f) => f !== "testName");
     }
-    if (editDraft.resultValue.trim() !== original.resultValue.trim() && editDraft.resultValue.trim().length > 0) {
+    if (
+      editDraft.resultValue.trim() !== original.resultValue.trim() &&
+      editDraft.resultValue.trim().length > 0
+    ) {
       remainingAmbiguousFields = remainingAmbiguousFields.filter((f) => f !== "resultValue");
     }
     if ((editDraft.unit || "").trim() !== (original.unit || "").trim()) {
@@ -185,7 +194,10 @@ export function ReportVerificationPanel({
   // Add new row manually
   const handleAddNewRow = () => {
     if (!newRow.testName?.trim() || !newRow.resultValue?.trim()) return;
-    const cleanNum = newRow.resultValue.replace(/,/g, "").replace(/^[<>]=?\s*/, "").trim();
+    const cleanNum = newRow.resultValue
+      .replace(/,/g, "")
+      .replace(/^[<>]=?\s*/, "")
+      .trim();
     const num = /^-?\d+(\.\d+)?$/.test(cleanNum) ? Number.parseFloat(cleanNum) : null;
 
     const row: StructuredBiomarkerCandidate = {
@@ -217,15 +229,35 @@ export function ReportVerificationPanel({
   const getFlagBadge = (flag?: string) => {
     switch (flag) {
       case "high":
-        return <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20">High</Badge>;
+        return (
+          <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20">
+            High
+          </Badge>
+        );
       case "low":
-        return <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20">Low</Badge>;
+        return (
+          <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20">
+            Low
+          </Badge>
+        );
       case "abnormal":
-        return <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20">Abnormal</Badge>;
+        return (
+          <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20">
+            Abnormal
+          </Badge>
+        );
       case "normal":
-        return <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/20">Normal</Badge>;
+        return (
+          <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/20">
+            Normal
+          </Badge>
+        );
       default:
-        return <Badge variant="outline" className="text-muted-foreground text-[10px]">Unspecified</Badge>;
+        return (
+          <Badge variant="outline" className="text-muted-foreground text-[10px]">
+            Unspecified
+          </Badge>
+        );
     }
   };
 
@@ -337,9 +369,13 @@ export function ReportVerificationPanel({
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                   <div>
                     <div className="flex items-center justify-between mb-0.5">
-                      <Label className="text-[11px] text-muted-foreground">Test / Biomarker Name</Label>
+                      <Label className="text-[11px] text-muted-foreground">
+                        Test / Biomarker Name
+                      </Label>
                       {editDraft.ambiguousFields?.includes("testName") && (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">Needs review</span>
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">
+                          Needs review
+                        </span>
                       )}
                     </div>
                     <Input
@@ -353,7 +389,9 @@ export function ReportVerificationPanel({
                     <div className="flex items-center justify-between mb-0.5">
                       <Label className="text-[11px] text-muted-foreground">Result Value</Label>
                       {editDraft.ambiguousFields?.includes("resultValue") && (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">Needs review</span>
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">
+                          Needs review
+                        </span>
                       )}
                     </div>
                     <Input
@@ -367,7 +405,9 @@ export function ReportVerificationPanel({
                     <div className="flex items-center justify-between mb-0.5">
                       <Label className="text-[11px] text-muted-foreground">Unit</Label>
                       {editDraft.ambiguousFields?.includes("unit") && (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">Needs review</span>
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">
+                          Needs review
+                        </span>
                       )}
                     </div>
                     <Input
@@ -381,12 +421,16 @@ export function ReportVerificationPanel({
                     <div className="flex items-center justify-between mb-0.5">
                       <Label className="text-[11px] text-muted-foreground">Reference Range</Label>
                       {editDraft.ambiguousFields?.includes("referenceRange") && (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">Needs review</span>
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/15 px-1 rounded">
+                          Needs review
+                        </span>
                       )}
                     </div>
                     <Input
                       value={editDraft.referenceText || ""}
-                      onChange={(e) => setEditDraft({ ...editDraft, referenceText: e.target.value })}
+                      onChange={(e) =>
+                        setEditDraft({ ...editDraft, referenceText: e.target.value })
+                      }
                       className={`h-8 text-xs ${editDraft.ambiguousFields?.includes("referenceRange") ? "border-amber-500/60 ring-1 ring-amber-500/30 bg-amber-500/5" : ""}`}
                       placeholder="e.g. 13.0 - 17.0"
                     />
@@ -419,12 +463,7 @@ export function ReportVerificationPanel({
                     >
                       <X className="size-3.5 mr-1" /> Cancel
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={saveEdit}
-                      className="h-7 text-xs px-3"
-                    >
+                    <Button type="button" size="sm" onClick={saveEdit} className="h-7 text-xs px-3">
                       <Check className="size-3.5 mr-1" /> Done
                     </Button>
                   </div>
@@ -456,7 +495,9 @@ export function ReportVerificationPanel({
                     {c.sourcePage && (
                       <span className="text-[10px] text-muted-foreground/70">
                         Page {c.sourcePage}
-                        {c.sourceRegion?.startLine ? ` • Line ${c.sourceRegion.startLine}${c.sourceRegion.endLine && c.sourceRegion.endLine !== c.sourceRegion.startLine ? `-${c.sourceRegion.endLine}` : ""}` : ""}
+                        {c.sourceRegion?.startLine
+                          ? ` • Line ${c.sourceRegion.startLine}${c.sourceRegion.endLine && c.sourceRegion.endLine !== c.sourceRegion.startLine ? `-${c.sourceRegion.endLine}` : ""}`
+                          : ""}
                       </span>
                     )}
                   </div>
@@ -466,7 +507,17 @@ export function ReportVerificationPanel({
                     <div className="space-y-1 pt-0.5">
                       <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium">
                         <AlertTriangle className="size-3 shrink-0" />
-                        {c.ambiguityReason || "Unclear OCR read. Please verify fields before saving."}
+                        {Array.from(
+                          new Set(
+                            (
+                              c.ambiguityReason ||
+                              "Unclear OCR read. Please verify fields before saving."
+                            )
+                              .split(";")
+                              .map((s) => s.trim())
+                              .filter(Boolean),
+                          ),
+                        ).join("; ")}
                       </p>
                       {c.ambiguousFields && c.ambiguousFields.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -488,7 +539,10 @@ export function ReportVerificationPanel({
                 <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end">
                   <div className="text-right">
                     <div className="font-mono font-bold text-sm text-foreground">
-                      {c.resultValue} {c.unit && <span className="text-xs font-normal text-muted-foreground">{c.unit}</span>}
+                      {c.resultValue}{" "}
+                      {c.unit && (
+                        <span className="text-xs font-normal text-muted-foreground">{c.unit}</span>
+                      )}
                     </div>
                     {c.referenceText && (
                       <div className="text-[11px] text-muted-foreground">

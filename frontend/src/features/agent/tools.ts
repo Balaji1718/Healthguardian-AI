@@ -162,7 +162,9 @@ export const TOOLS: ToolDefinition[] = [
         at: toDate(r.recordedAt)?.toISOString().slice(0, 10),
         source: r.sourceType,
         sourceName: r.sourceName,
-        reference: r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
+        reference:
+          r.referenceText ||
+          (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
         flag: r.flag || "normal",
       }));
       return {
@@ -227,7 +229,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "getLatestLabResults",
-    description: "User-verified structured lab test results from latest medical reports. Args: { limit?: number }",
+    description:
+      "User-verified structured lab test results from latest medical reports. Args: { limit?: number }",
     args: '{ "limit": 20 }',
     readOrWrite: "read",
     authorizationRequired: true,
@@ -238,7 +241,9 @@ export const TOOLS: ToolDefinition[] = [
         testName: r.testName,
         value: r.resultValue,
         unit: r.unit ?? "",
-        reference: r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
+        reference:
+          r.referenceText ||
+          (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : ""),
         flag: r.flag || "normal",
         page: r.sourcePage ?? 1,
         date: r.verifiedAt ? toDate(r.verifiedAt)?.toISOString().slice(0, 10) : undefined,

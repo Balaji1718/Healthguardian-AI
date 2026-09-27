@@ -155,7 +155,7 @@ export function buildDocumentRegions(pages, options = { maxSpan: 4 }) {
             const prevLine = spanLines[k - 1];
             const currLine = spanLines[k];
             const prevHasNum = prevLine.hasNumber;
-            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|\<|\>)/i.test(currLine.rawText);
+            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|negative|positive|reactive|non-reactive|non\s*reactive|trace|nil|absent|cutoff|cut-off|borderline|equivocal|odratio|index|method|interpretation|result|\<|\>)/i.test(currLine.rawText);
             const currHasWordsAndNum = /[a-zA-Z]{3,}/.test(currLine.rawText) && currLine.hasNumber;
             if (prevHasNum && currHasWordsAndNum && !isRefContinuation) {
               hasCrossRowMerge = true;
@@ -224,7 +224,19 @@ export function unitMatchesInRegion(unitStr, regionNorm) {
   if (!unitStr || !regionNorm) return false;
   const normUnit = normalizeForSearch(unitStr).replace(/µ/g, "u");
   const regNormU = regionNorm.replace(/µ/g, "u");
-  return regNormU.includes(normUnit);
+  if (regNormU.includes(normUnit)) return true;
+
+  // Space-collapsed matching (e.g. "od ratio" vs "odratio")
+  const collapsedUnit = normUnit.replace(/\s+/g, "");
+  const collapsedRegion = regNormU.replace(/\s+/g, "");
+  if (collapsedUnit.length > 1 && collapsedRegion.includes(collapsedUnit)) return true;
+
+  // OCR letter-zero confusion (e.g. "0dratio" vs "odratio")
+  const oReplacedUnit = collapsedUnit.replace(/0/g, "o");
+  const oReplacedRegion = collapsedRegion.replace(/0/g, "o");
+  if (oReplacedUnit.length > 1 && oReplacedRegion.includes(oReplacedUnit)) return true;
+
+  return false;
 }
 
 /**
@@ -233,10 +245,61 @@ export function unitMatchesInRegion(unitStr, regionNorm) {
 export function referenceMatchesInRegion(candidate, regionNorm) {
   if (!regionNorm) return false;
 
+  const rawRef = String(candidate.referenceText || "").trim();
+  const refTextNorm = normalizeForSearch(rawRef);
+
   // Exact reference text match
-  if (candidate.referenceText && candidate.referenceText.trim().length > 0) {
-    const refTextNorm = normalizeForSearch(candidate.referenceText);
-    if (regionNorm.includes(refTextNorm)) return true;
+  if (refTextNorm.length > 0 && regionNorm.includes(refTextNorm)) {
+    return true;
+  }
+
+  // Space-collapsed matching
+  const noSpaceRef = refTextNorm.replace(/\s+/g, "");
+  const noSpaceRegion = regionNorm.replace(/\s+/g, "");
+  if (noSpaceRef.length > 2 && noSpaceRegion.includes(noSpaceRef)) return true;
+
+  // Qualitative reference patterns & abbreviations
+  if (/negative|non-?reactive|absent|nil/i.test(rawRef)) {
+    if (
+      /\b(?:neg|negative|non-?reactive|nil|absent|-ve|\(-ve\)|[-–]ve)\b/i.test(regionNorm) ||
+      regionNorm.includes("negative") ||
+      regionNorm.includes("neg") ||
+      regionNorm.includes("non reactive") ||
+      regionNorm.includes("nonreactive")
+    ) {
+      return true;
+    }
+  }
+
+  if (/positive|reactive|present/i.test(rawRef)) {
+    if (
+      /\b(?:pos|positive|reactive|present|\+ve|\(\+ve\)|\+)\b/i.test(regionNorm) ||
+      regionNorm.includes("positive") ||
+      regionNorm.includes("pos") ||
+      regionNorm.includes("reactive")
+    ) {
+      return true;
+    }
+  }
+
+  if (/normal/i.test(rawRef)) {
+    if (/\b(?:normal|norm)\b/i.test(regionNorm) || regionNorm.includes("normal")) {
+      return true;
+    }
+  }
+
+  // Threshold e.g. "< 1.0" or "<= 1.0" or "<1.00"
+  const thresholdMatch = /([<>]=?)\s*(\d+(?:\.\d+)?)/.exec(rawRef);
+  if (thresholdMatch) {
+    const sym = thresholdMatch[1];
+    const val = thresholdMatch[2];
+    if (
+      (sym && val && regionNorm.includes(`${sym} ${val}`)) ||
+      (sym && val && regionNorm.includes(`${sym}${val}`)) ||
+      (val && regionNorm.includes(val))
+    ) {
+      return true;
+    }
   }
 
   const lowStr = candidate.referenceLow !== null && candidate.referenceLow !== undefined
@@ -546,16 +609,25 @@ export function reconcileWithSourceOcr(candidate, pages) {
     } else if (/negative|non-reactive|absent|nil/i.test(candidate.resultValue) && regionNorm.includes(normalizeForSearch(candidate.resultValue))) {
       resolvedFlag = "normal";
       groundingStatus.flag = "source_supported";
+    } else if (
+      /negative|non-reactive|absent|nil/i.test(candidate.referenceText || "") &&
+      (rawFlag === "normal" || rawFlag === "unknown" || !rawFlag) &&
+      (candidate.numericValue === null || (candidate.referenceHigh !== null ? candidate.numericValue <= candidate.referenceHigh : true))
+    ) {
+      resolvedFlag = "normal";
+      groundingStatus.flag = "source_supported";
     } else {
       resolvedFlag = "unknown";
       groundingStatus.flag = "unknown";
     }
   }
 
+  // Deduplicate ambiguity reasons
+  const uniqueReasons = Array.from(new Set(ambiguityReasons.filter(Boolean)));
   candidate.flag = resolvedFlag;
   candidate.isAmbiguous = isAmbiguous;
   candidate.ambiguousFields = ambiguousFields;
-  candidate.ambiguityReason = ambiguityReasons.join("; ");
+  candidate.ambiguityReason = uniqueReasons.join("; ");
   candidate.groundingStatus = groundingStatus;
 
   return candidate;

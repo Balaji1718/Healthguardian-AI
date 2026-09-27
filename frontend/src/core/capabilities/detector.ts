@@ -9,7 +9,10 @@ export function detectIsMobileOrTablet(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   const isIpadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua) || isIpadOS;
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua) ||
+    isIpadOS
+  );
 }
 
 export function detectDirectCameraCapture(): boolean {
@@ -56,7 +59,9 @@ export function detectIndexedDbSupport(): boolean {
 export function detectIsIosSafari(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  const isIos = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isIos =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isOtherIosBrowser = /CriOS|FxiOS|OPiOS|EdgiOS|mercury/i.test(ua);
   return isIos && !isOtherIosBrowser;
 }

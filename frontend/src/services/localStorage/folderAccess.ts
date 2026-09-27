@@ -144,7 +144,10 @@ export async function getDirectoryEntries(
   handle: FileSystemDirectoryHandle,
 ): Promise<FileSystemHandle[]> {
   const items: FileSystemHandle[] = [];
-  const handleAny = handle as any;
+  const handleAny = handle as unknown as {
+    values?: () => AsyncIterable<FileSystemHandle>;
+    entries?: () => AsyncIterable<[string, FileSystemHandle]>;
+  };
 
   if (typeof handleAny.values === "function") {
     try {
@@ -170,7 +173,7 @@ export async function getDirectoryEntries(
 
   if (typeof (handle as unknown as AsyncIterable<unknown>)[Symbol.asyncIterator] === "function") {
     try {
-      for await (const item of (handle as unknown as AsyncIterable<unknown>)) {
+      for await (const item of handle as unknown as AsyncIterable<unknown>) {
         const entry = Array.isArray(item) ? item[1] : item;
         if (entry && typeof entry === "object" && "kind" in (entry as Record<string, unknown>)) {
           items.push(entry as FileSystemHandle);
@@ -291,12 +294,14 @@ export async function scanFolderFiles(
 
   // Deduplicate entries by filename in case multiple iterations yielded the same handle
   const uniqueEntries = Array.from(
-    entries.reduce((map, item) => {
-      if (!map.has(item.name)) {
-        map.set(item.name, item);
-      }
-      return map;
-    }, new Map<string, ConnectedFileEntry>()).values(),
+    entries
+      .reduce((map, item) => {
+        if (!map.has(item.name)) {
+          map.set(item.name, item);
+        }
+        return map;
+      }, new Map<string, ConnectedFileEntry>())
+      .values(),
   );
 
   // Sort files: supported first, then new/changed first, then alphabetical

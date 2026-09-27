@@ -16,6 +16,7 @@ import { extractConversationalCheckin, convertAndImproveTranscript } from './con
 import { interpretUserInput } from './interpretation-orchestrator.js';
 import { understandMedicalDocument } from './document-understanding.js';
 import { sendUserPush, verifyIdToken, getAdminApp } from './firebase-admin.js';
+import { sendPasswordResetOtp, verifyPasswordResetOtp, resetPasswordWithToken } from './auth-otp.js';
 
 const frontendRoot = path.resolve(__dirname, '../frontend');
 const isProduction = process.env.NODE_ENV === 'production';
@@ -208,6 +209,37 @@ app.post('/api/support/email', async (req, res) => {
     console.error('[Support Email] Dispatch failed:', err.message);
     return res.status(200).json({ ok: true, delivered: false, stored: true, error: err.message });
   }
+});
+
+// Authentication OTP Password Reset Endpoints
+app.post('/api/auth/otp/send', async (req, res) => {
+  const email = req.body?.email;
+  const clientIp = req.ip || req.socket?.remoteAddress || '';
+  const result = await sendPasswordResetOtp(email, clientIp);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.status(200).json(result);
+});
+
+app.post('/api/auth/otp/verify', async (req, res) => {
+  const email = req.body?.email;
+  const otp = req.body?.otp;
+  const result = await verifyPasswordResetOtp(email, otp);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.status(200).json(result);
+});
+
+app.post('/api/auth/otp/reset-password', async (req, res) => {
+  const resetSessionToken = req.body?.resetSessionToken;
+  const newPassword = req.body?.newPassword;
+  const result = await resetPasswordWithToken(resetSessionToken, newPassword);
+  if (!result.ok) {
+    return res.status(400).json(result);
+  }
+  return res.status(200).json(result);
 });
 
 async function authenticateNotificationRequest(req, res, next) {

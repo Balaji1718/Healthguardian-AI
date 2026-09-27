@@ -198,7 +198,15 @@
     "signInSuccess": "वापसी पर स्वागत है!",
     "signUpSuccess": "खाता सफलतापूर्वक बनाया गया!",
     "checkingSession": "आपका सत्र जाँचा जा रहा है…",
-    "redirectingToDashboard": "आपके डैशबोर्ड पर ले जाया जा रहा है…"
+    "redirectingToDashboard": "आपके डैशबोर्ड पर ले जाया जा रहा है…",
+    "sendOtp": "सत्यापन कोड भेजें",
+    "verifyOtp": "कोड सत्यापित करें",
+    "resendOtp": "कोड पुनः भेजें",
+    "otpCode": "6 अंकों का सत्यापन कोड",
+    "newPassword": "नया पासवर्ड",
+    "setNewPassword": "पासवर्ड रीसेट करें",
+    "otpSentNotice": "हमने 6 अंकों का सत्यापन कोड भेजा है:",
+    "passwordResetSuccess": "आपका पासवर्ड सफलतापूर्वक रीसेट हो गया है। कृपया अपने नए पासवर्ड से साइन इन करें।"
   },
   "dashboard": {
     "greeting": "वापसी पर स्वागत है",

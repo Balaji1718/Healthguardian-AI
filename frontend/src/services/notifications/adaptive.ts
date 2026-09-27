@@ -1,4 +1,5 @@
 import { pushNotification } from "./notifications";
+import { checkinIdForDate } from "@/services/firebase/repositories";
 import { calculateAdaptiveEvidence } from "@/features/healthRisk/engine";
 import { buildHealthContext } from "@/core/adaptive/context";
 import type { DailyCheckin } from "@/models";
@@ -39,7 +40,7 @@ export async function syncAdaptiveNotifications(uid: string, checkins: DailyChec
     // default state
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = checkinIdForDate(new Date());
   const dailyCount = state.dailyCounts[todayStr] ?? 0;
 
   if (dailyCount >= 3) {

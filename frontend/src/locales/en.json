@@ -198,7 +198,15 @@
     "signInSuccess": "Welcome back!",
     "signUpSuccess": "Account created successfully!",
     "checkingSession": "Checking your session…",
-    "redirectingToDashboard": "Redirecting to your dashboard…"
+    "redirectingToDashboard": "Redirecting to your dashboard…",
+    "sendOtp": "Send verification code",
+    "verifyOtp": "Verify code",
+    "resendOtp": "Resend code",
+    "otpCode": "6-digit verification code",
+    "newPassword": "New password",
+    "setNewPassword": "Reset password",
+    "otpSentNotice": "We sent a 6-digit verification code to",
+    "passwordResetSuccess": "Your password has been reset successfully. Please sign in with your new password."
   },
   "dashboard": {
     "greeting": "Welcome back",

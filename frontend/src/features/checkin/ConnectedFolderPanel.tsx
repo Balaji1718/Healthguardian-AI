@@ -229,7 +229,9 @@ export function ConnectedFolderPanel({
       } else if (newCount > 0) {
         toast.info(`${newCount} new health file${newCount > 1 ? "s" : ""} found in folder.`);
       } else if (removedCount > 0) {
-        toast.info(`${removedCount} file${removedCount > 1 ? "s were" : " was"} removed from folder.`);
+        toast.info(
+          `${removedCount} file${removedCount > 1 ? "s were" : " was"} removed from folder.`,
+        );
       } else if (files.length === 0) {
         toast.info("Folder refreshed: connected directory is currently empty.");
       } else {

@@ -1,4 +1,5 @@
 import {
+  checkinIdForDate,
   createNotification,
   listNotifications,
   updateNotification,
@@ -203,7 +204,7 @@ const DEDUPE_KEY = "hg_pattern_alerts";
 /** Context-aware alerts, deduplicated per day so we never spam the user. */
 export async function syncPatternNotifications(uid: string, patterns: DetectedPattern[]) {
   if (typeof window === "undefined") return;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = checkinIdForDate(new Date());
   let seen: Record<string, string> = {};
   try {
     seen = JSON.parse(window.localStorage.getItem(DEDUPE_KEY) ?? "{}") as Record<string, string>;

@@ -1,16 +1,7 @@
-import type { MedicalResult } from "@/models";
+import type { MedicalResult, GroundingStatusRecord } from "@/models";
 
 export type AmbiguousFieldType = "testName" | "resultValue" | "unit" | "referenceRange" | "flag";
-
-export interface GroundingStatusRecord {
-  testName?: string;
-  resultValue?: string;
-  unit?: string;
-  referenceRange?: string;
-  flag?: string;
-  sourcePageValid?: string;
-  overall?: string;
-}
+export type { GroundingStatusRecord };
 
 export interface StructuredBiomarkerCandidate extends Omit<MedicalResult, "userVerified"> {
   userVerified: boolean;
@@ -52,7 +43,7 @@ export interface DocumentRegion {
   lines: string[];
 }
 
-export function normalizeForSearch(str: any): string {
+export function normalizeForSearch(str: unknown): string {
   return String(str || "")
     .toLowerCase()
     .replace(/haem/g, "hem")
@@ -68,7 +59,7 @@ export function normalizeForSearch(str: any): string {
  * - Single-line regions (individual rows)
  * - Bounded multi-line window regions (spans of 2 to 3 lines) to support
  *   wrapped test names, values on subsequent lines, or wrapped ranges.
- * 
+ *
  * Each region preserves line provenance, page number, and source text.
  */
 export function buildDocumentRegions(
@@ -86,7 +77,12 @@ export function buildDocumentRegions(
     const pageText = pageObj?.text || "";
 
     const rawLines = pageText.split(/\r?\n/);
-    const lineEntries: Array<{ lineIndex: number; rawText: string; normalizedText: string; hasNumber: boolean }> = [];
+    const lineEntries: Array<{
+      lineIndex: number;
+      rawText: string;
+      normalizedText: string;
+      hasNumber: boolean;
+    }> = [];
 
     for (let lIdx = 0; lIdx < rawLines.length; lIdx++) {
       const lineStr = (rawLines[lIdx] ?? "").trim();
@@ -115,7 +111,10 @@ export function buildDocumentRegions(
             const currLine = spanLines[k];
             if (!prevLine || !currLine) continue;
             const prevHasNum = prevLine.hasNumber;
-            const isRefContinuation = /^(?:ref|range|biological|interval|normal|adult|female|male|critical|negative|positive|reactive|non-reactive|non\s*reactive|trace|nil|absent|cutoff|cut-off|borderline|equivocal|odratio|index|method|interpretation|result|\<|\>)/i.test(currLine.rawText);
+            const isRefContinuation =
+              /^(?:ref|range|biological|interval|normal|adult|female|male|critical|negative|positive|reactive|non-reactive|non\s*reactive|trace|nil|absent|cutoff|cut-off|borderline|equivocal|odratio|index|method|interpretation|result|<|>)/i.test(
+                currLine.rawText,
+              );
             const currHasWordsAndNum = /[a-zA-Z]{3,}/.test(currLine.rawText) && currLine.hasNumber;
             if (prevHasNum && currHasWordsAndNum && !isRefContinuation) {
               hasCrossRowMerge = true;
@@ -130,8 +129,8 @@ export function buildDocumentRegions(
         const combinedText = spanLines.map((l) => l.rawText).join(" ");
         const firstSpan = spanLines[0];
         const lastSpan = spanLines[spanLines.length - 1];
-        const startLine = firstSpan?.lineIndex ?? (i + 1);
-        const endLine = lastSpan?.lineIndex ?? (i + span);
+        const startLine = firstSpan?.lineIndex ?? i + 1;
+        const endLine = lastSpan?.lineIndex ?? i + span;
 
         regions.push({
           id: `p${pageNum}_L${startLine}${span > 1 ? `-${endLine}` : ""}`,
@@ -155,7 +154,11 @@ export function buildDocumentRegions(
  * Checks raw string, numeric float/int, comma formatted thousands (11,800),
  * and comma decimals (14,2).
  */
-export function valueMatchesInRegion(valStr: any, numVal: number | null | undefined, regionNorm: string): boolean {
+export function valueMatchesInRegion(
+  valStr: unknown,
+  numVal: number | null | undefined,
+  regionNorm: string,
+): boolean {
   if (!regionNorm) return false;
   const cleanVal = normalizeForSearch(valStr);
   if (cleanVal && regionNorm.includes(cleanVal)) return true;
@@ -182,7 +185,7 @@ export function valueMatchesInRegion(valStr: any, numVal: number | null | undefi
 /**
  * Tests whether a unit is present in a region's normalized text.
  */
-export function unitMatchesInRegion(unitStr: any, regionNorm: string): boolean {
+export function unitMatchesInRegion(unitStr: unknown, regionNorm: string): boolean {
   if (!regionNorm || !unitStr) return false;
   const normUnit = normalizeForSearch(unitStr).replace(/µ/g, "u");
   const regWithU = regionNorm.replace(/µ/g, "u");
@@ -211,7 +214,10 @@ export function unitMatchesInRegion(unitStr: any, regionNorm: string): boolean {
  * Tests whether a reference range is present in a region's normalized text.
  * Distinguishes numeric intervals, upper/lower thresholds, and qualitative references.
  */
-export function referenceMatchesInRegion(candidate: any, regionNorm: string): boolean {
+export function referenceMatchesInRegion(
+  candidate: StructuredBiomarkerCandidate,
+  regionNorm: string,
+): boolean {
   if (!regionNorm || !candidate) return false;
 
   const rawRef = String(candidate.referenceText || "").trim();
@@ -267,8 +273,14 @@ export function referenceMatchesInRegion(candidate: any, regionNorm: string): bo
     }
   }
 
-  const lowStr = candidate.referenceLow !== null && candidate.referenceLow !== undefined ? String(candidate.referenceLow) : "";
-  const highStr = candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ? String(candidate.referenceHigh) : "";
+  const lowStr =
+    candidate.referenceLow !== null && candidate.referenceLow !== undefined
+      ? String(candidate.referenceLow)
+      : "";
+  const highStr =
+    candidate.referenceHigh !== null && candidate.referenceHigh !== undefined
+      ? String(candidate.referenceHigh)
+      : "";
 
   if (lowStr && highStr) {
     const lowIdx = regionNorm.indexOf(lowStr);
@@ -308,9 +320,9 @@ export function referenceMatchesInRegion(candidate: any, regionNorm: string): bo
  * to disambiguate repeated identical test names across sections or pages.
  */
 export function findAnchorRegion(
-  candidate: any,
+  candidate: StructuredBiomarkerCandidate,
   regions: DocumentRegion[],
-  _pages: any[],
+  _pages: unknown[],
 ): (DocumentRegion & { isAmbiguousChoice?: boolean }) | null {
   if (!candidate || !Array.isArray(regions) || regions.length === 0) return null;
 
@@ -324,13 +336,15 @@ export function findAnchorRegion(
 
   for (const reg of regions) {
     const hasExact = reg.normalizedText.includes(normTestName);
-    const hasTokens = testTokens.length > 0 && testTokens.every((tok) => reg.normalizedText.includes(tok));
+    const hasTokens =
+      testTokens.length > 0 && testTokens.every((tok) => reg.normalizedText.includes(tok));
 
     if (hasExact || hasTokens) {
       // Anchor must start at or contain the test name in its first line
       const firstLineText = reg.lines[0] ?? "";
       const firstLineNorm = normalizeForSearch(firstLineText);
-      const startsWithTest = testTokens.length > 0 && testTokens.some((tok) => firstLineNorm.includes(tok));
+      const startsWithTest =
+        testTokens.length > 0 && testTokens.some((tok) => firstLineNorm.includes(tok));
       if (!startsWithTest && reg.span > 1) {
         continue;
       }
@@ -344,10 +358,11 @@ export function findAnchorRegion(
       if (reg.page === specifiedPage) score += 8;
 
       // Prefer minimal span (compactness) when the region contains the test name
-      score += (5 - reg.span);
+      score += 5 - reg.span;
 
       // Contextual evidence for multiple identical test names
-      if (valueMatchesInRegion(candidate.resultValue, candidate.numericValue, reg.normalizedText)) score += 4;
+      if (valueMatchesInRegion(candidate.resultValue, candidate.numericValue, reg.normalizedText))
+        score += 4;
       if (candidate.unit && unitMatchesInRegion(candidate.unit, reg.normalizedText)) score += 2;
       if (referenceMatchesInRegion(candidate, reg.normalizedText)) score += 3;
 
@@ -377,11 +392,11 @@ export function findAnchorRegion(
 /**
  * Reconciles an extracted candidate against the original source OCR pages
  * at the TEST-ROW / REGION level.
- * 
+ *
  * Core rule:
  * "The extracted test name, result value, unit, and reference range must be
  *  supported by the same logical source row/region."
- * 
+ *
  * Cross-row contamination (e.g. borrowing value, unit, or range from another row)
  * is strictly rejected from being marked source_supported.
  */
@@ -394,10 +409,12 @@ export function reconcileWithSourceOcr(
   }
 
   const numPages = pages.length;
-  const specifiedPage = Number.isInteger(candidate.sourcePage) ? (candidate.sourcePage as number) : 1;
+  const specifiedPage = Number.isInteger(candidate.sourcePage)
+    ? (candidate.sourcePage as number)
+    : 1;
   const isPageValid = specifiedPage >= 1 && specifiedPage <= numPages;
 
-  const groundingStatus: Record<string, string> = {
+  const groundingStatus: GroundingStatusRecord = {
     testName: "unsupported",
     resultValue: "unsupported",
     unit: "not_applicable",
@@ -415,7 +432,9 @@ export function reconcileWithSourceOcr(
   if (!isPageValid) {
     isAmbiguous = true;
     if (!ambiguousFields.includes("testName")) ambiguousFields.push("testName");
-    ambiguityReasons.push(`Specified source page ${specifiedPage} does not exist in document (document has ${numPages} pages)`);
+    ambiguityReasons.push(
+      `Specified source page ${specifiedPage} does not exist in document (document has ${numPages} pages)`,
+    );
   }
 
   // Derive logical source regions across document
@@ -428,11 +447,12 @@ export function reconcileWithSourceOcr(
     groundingStatus.testName = "unsupported";
     groundingStatus.resultValue = "unsupported";
     groundingStatus.unit = candidate.unit ? "unsupported" : "not_applicable";
-    groundingStatus.referenceRange = (candidate.referenceLow !== null && candidate.referenceLow !== undefined ||
-      candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ||
-      candidate.referenceText)
-      ? "unsupported"
-      : "not_applicable";
+    groundingStatus.referenceRange =
+      (candidate.referenceLow !== null && candidate.referenceLow !== undefined) ||
+      (candidate.referenceHigh !== null && candidate.referenceHigh !== undefined) ||
+      candidate.referenceText
+        ? "unsupported"
+        : "not_applicable";
     isAmbiguous = true;
     if (!ambiguousFields.includes("testName")) ambiguousFields.push("testName");
     ambiguityReasons.push(`Test name "${candidate.testName}" is not supported by source OCR`);
@@ -466,7 +486,9 @@ export function reconcileWithSourceOcr(
 
   if (anchorRegion.page !== specifiedPage && isPageValid) {
     groundingStatus.testName = "partially_supported";
-    ambiguityReasons.push(`Test name "${candidate.testName}" appears on page ${anchorRegion.page}, not page ${specifiedPage}`);
+    ambiguityReasons.push(
+      `Test name "${candidate.testName}" appears on page ${anchorRegion.page}, not page ${specifiedPage}`,
+    );
     isAmbiguous = true;
   }
 
@@ -474,7 +496,11 @@ export function reconcileWithSourceOcr(
 
   // 2. Validate resultValue strictly against the anchor test-row region
   const rawVal = String(candidate.resultValue || "").trim();
-  const valInAnchor = valueMatchesInRegion(candidate.resultValue, candidate.numericValue, regionNorm);
+  const valInAnchor = valueMatchesInRegion(
+    candidate.resultValue,
+    candidate.numericValue,
+    regionNorm,
+  );
 
   if (valInAnchor) {
     groundingStatus.resultValue = "source_supported";
@@ -483,7 +509,7 @@ export function reconcileWithSourceOcr(
     isAmbiguous = true;
     if (!ambiguousFields.includes("resultValue")) ambiguousFields.push("resultValue");
     ambiguityReasons.push(
-      `Result value "${rawVal}" is not supported by source OCR in the test row region (page ${anchorRegion.page}, lines ${anchorRegion.startLine}-${anchorRegion.endLine})`
+      `Result value "${rawVal}" is not supported by source OCR in the test row region (page ${anchorRegion.page}, lines ${anchorRegion.startLine}-${anchorRegion.endLine})`,
     );
   }
 
@@ -496,15 +522,18 @@ export function reconcileWithSourceOcr(
       groundingStatus.unit = "unsupported";
       isAmbiguous = true;
       if (!ambiguousFields.includes("unit")) ambiguousFields.push("unit");
-      ambiguityReasons.push(`Unit "${candidate.unit}" is not supported by source OCR in the test row region`);
+      ambiguityReasons.push(
+        `Unit "${candidate.unit}" is not supported by source OCR in the test row region`,
+      );
     }
   } else {
     groundingStatus.unit = "not_applicable";
   }
 
   // 4. Validate referenceRange strictly against the anchor test-row region
-  const hasRefBounds = candidate.referenceLow !== null && candidate.referenceLow !== undefined ||
-    candidate.referenceHigh !== null && candidate.referenceHigh !== undefined ||
+  const hasRefBounds =
+    (candidate.referenceLow !== null && candidate.referenceLow !== undefined) ||
+    (candidate.referenceHigh !== null && candidate.referenceHigh !== undefined) ||
     (candidate.referenceText && candidate.referenceText.trim().length > 0);
   if (hasRefBounds) {
     const refInAnchor = referenceMatchesInRegion(candidate, regionNorm);
@@ -515,7 +544,7 @@ export function reconcileWithSourceOcr(
       isAmbiguous = true;
       if (!ambiguousFields.includes("referenceRange")) ambiguousFields.push("referenceRange");
       ambiguityReasons.push(
-        `Reference range "${candidate.referenceText || `${candidate.referenceLow}-${candidate.referenceHigh}`}" is not supported by source OCR in the test row region`
+        `Reference range "${candidate.referenceText || `${candidate.referenceLow}-${candidate.referenceHigh}`}" is not supported by source OCR in the test row region`,
       );
     }
   } else {
@@ -523,7 +552,9 @@ export function reconcileWithSourceOcr(
   }
 
   // 5. Strict Flag-Resolution Hierarchy
-  const rawFlag = String(candidate.flag || "").toLowerCase().trim();
+  const rawFlag = String(candidate.flag || "")
+    .toLowerCase()
+    .trim();
   const num = candidate.numericValue ?? null;
   const refLow = candidate.referenceLow ?? null;
   const refHigh = candidate.referenceHigh ?? null;
@@ -544,19 +575,18 @@ export function reconcileWithSourceOcr(
       else mathFlag = "normal";
     }
 
-    const isAiContradiction = (
+    const isAiContradiction =
       (rawFlag === "high" && mathFlag !== "high") ||
       (rawFlag === "low" && mathFlag !== "low") ||
       (rawFlag === "normal" && mathFlag !== "normal") ||
-      (rawFlag === "abnormal" && mathFlag === "normal")
-    );
+      (rawFlag === "abnormal" && mathFlag === "normal");
 
     if (isAiContradiction) {
       resolvedFlag = "unknown";
       isAmbiguous = true;
       if (!ambiguousFields.includes("flag")) ambiguousFields.push("flag");
       ambiguityReasons.push(
-        `Contradictory flag: AI reported "${rawFlag}" but reference range calculation indicates "${mathFlag}"`
+        `Contradictory flag: AI reported "${rawFlag}" but reference range calculation indicates "${mathFlag}"`,
       );
       groundingStatus.flag = "contradictory";
     } else {
@@ -567,19 +597,40 @@ export function reconcileWithSourceOcr(
     const printedIndicatorRegex = /\b(high|low|abnormal|\*|\(h\)|\(l\))\b/i;
     const hasPrintedIndicator = printedIndicatorRegex.test(regionNorm);
 
-    if (hasPrintedIndicator && (rawFlag === "high" || rawFlag === "low" || rawFlag === "abnormal")) {
-      resolvedFlag = rawFlag as any;
+    if (
+      hasPrintedIndicator &&
+      (rawFlag === "high" || rawFlag === "low" || rawFlag === "abnormal")
+    ) {
+      resolvedFlag = rawFlag as "normal" | "high" | "low" | "abnormal" | "unknown";
       groundingStatus.flag = "source_supported";
     } else if (rawFlag === "high" || rawFlag === "low" || rawFlag === "abnormal") {
       resolvedFlag = "unknown";
       isAmbiguous = true;
       if (!ambiguousFields.includes("flag")) ambiguousFields.push("flag");
-      ambiguityReasons.push(`Flag "${rawFlag}" lacks supporting reference range or printed flag in the test row region`);
+      ambiguityReasons.push(
+        `Flag "${rawFlag}" lacks supporting reference range or printed flag in the test row region`,
+      );
       groundingStatus.flag = "unsupported";
-    } else if (/positive|reactive|present/i.test(candidate.resultValue) && regionNorm.includes(normalizeForSearch(candidate.resultValue))) {
+    } else if (
+      /positive|reactive|present/i.test(candidate.resultValue) &&
+      regionNorm.includes(normalizeForSearch(candidate.resultValue))
+    ) {
       resolvedFlag = "abnormal";
       groundingStatus.flag = "source_supported";
-    } else if (/negative|non-reactive|absent|nil/i.test(candidate.resultValue) && regionNorm.includes(normalizeForSearch(candidate.resultValue))) {
+    } else if (
+      /negative|non-reactive|absent|nil/i.test(candidate.resultValue) &&
+      regionNorm.includes(normalizeForSearch(candidate.resultValue))
+    ) {
+      resolvedFlag = "normal";
+      groundingStatus.flag = "source_supported";
+    } else if (
+      /negative|non-reactive|absent|nil/i.test(candidate.referenceText || "") &&
+      (rawFlag === "normal" || rawFlag === "unknown" || !rawFlag) &&
+      (candidate.numericValue == null ||
+        (candidate.referenceHigh != null
+          ? candidate.numericValue <= candidate.referenceHigh
+          : true))
+    ) {
       resolvedFlag = "normal";
       groundingStatus.flag = "source_supported";
     } else {
@@ -588,10 +639,11 @@ export function reconcileWithSourceOcr(
     }
   }
 
+  const uniqueReasons = Array.from(new Set(ambiguityReasons.filter(Boolean)));
   candidate.flag = resolvedFlag;
   candidate.isAmbiguous = isAmbiguous;
   candidate.ambiguousFields = ambiguousFields;
-  candidate.ambiguityReason = ambiguityReasons.join("; ");
+  candidate.ambiguityReason = uniqueReasons.join("; ");
   candidate.groundingStatus = groundingStatus;
 
   return candidate;
@@ -605,7 +657,7 @@ export function reconcileWithSourceOcr(
  * - Normalizes field-level ambiguity tracking
  */
 export function validateMedicalCandidate(
-  raw: any,
+  raw: Record<string, unknown>,
   defaultPage = 1,
 ): { valid: boolean; candidate?: StructuredBiomarkerCandidate; rejectionReason?: string } {
   if (!raw || typeof raw !== "object") {
@@ -616,23 +668,36 @@ export function validateMedicalCandidate(
   const rawResultVal = String(raw.resultValue != null ? raw.resultValue : "").trim();
 
   // Rule 1: Never manufacture missing test names such as "Test 1", "Test 2", "Parameter 3", etc.
-  const manufacturedPattern = /^(test|parameter|investigation|sample|biomarker|row|item)\s*\d*$|^(unknown\s*test|unnamed)$/i;
+  const manufacturedPattern =
+    /^(test|parameter|investigation|sample|biomarker|row|item)\s*\d*$|^(unknown\s*test|unnamed)$/i;
   if (!rawTestName || manufacturedPattern.test(rawTestName)) {
-    return { valid: false, rejectionReason: `Manufactured or placeholder test name rejected: "${rawTestName}"` };
+    return {
+      valid: false,
+      rejectionReason: `Manufactured or placeholder test name rejected: "${rawTestName}"`,
+    };
   }
 
   // Reject administrative / demographic noise
-  const metadataNoiseRegex = /^(patient|name|age|gender|sex|date|doctor|referred|specimen|sample|barcode|reg|mrn|lab|hospital|page|report|phone|email|address|consultant|pathologist|signature|disclaimer|biological|reference\s*interval|units?|method|department)\b/i;
+  const metadataNoiseRegex =
+    /^(patient|name|age|gender|sex|date|doctor|referred|specimen|sample|barcode|reg|mrn|lab|hospital|page|report|phone|email|address|consultant|pathologist|signature|disclaimer|biological|reference\s*interval|units?|method|department)\b/i;
   if (metadataNoiseRegex.test(rawTestName)) {
-    return { valid: false, rejectionReason: `Administrative header/metadata rejected as test: "${rawTestName}"` };
+    return {
+      valid: false,
+      rejectionReason: `Administrative header/metadata rejected as test: "${rawTestName}"`,
+    };
   }
 
   // Reject adversarial / prompt-injection fragments or code markers
   if (
-    /(system\s*override|ignore\s*previous|instruction|fake\s*injected|prompt\s*injection)/i.test(rawTestName) ||
+    /(system\s*override|ignore\s*previous|instruction|fake\s*injected|prompt\s*injection)/i.test(
+      rawTestName,
+    ) ||
     /[{}"[\]]/.test(rawTestName)
   ) {
-    return { valid: false, rejectionReason: `Adversarial or prompt-injection content rejected: "${rawTestName}"` };
+    return {
+      valid: false,
+      rejectionReason: `Adversarial or prompt-injection content rejected: "${rawTestName}"`,
+    };
   }
 
   if (rawTestName.length < 2 || /^[^a-zA-Z]+$/.test(rawTestName)) {
@@ -640,28 +705,42 @@ export function validateMedicalCandidate(
   }
 
   if (!rawResultVal || rawResultVal === "---" || rawResultVal === "N/A" || rawResultVal === "-") {
-    return { valid: false, rejectionReason: `Missing or empty result value for test "${rawTestName}"` };
+    return {
+      valid: false,
+      rejectionReason: `Missing or empty result value for test "${rawTestName}"`,
+    };
   }
 
   const cleanNumStr = rawResultVal.replace(/,/g, "").replace(/^[<>]=?\s*/, "");
   const num = /^-?\d+(\.\d+)?$/.test(cleanNumStr)
     ? Number.parseFloat(cleanNumStr)
-    : (typeof raw.numericValue === "number" && Number.isFinite(raw.numericValue) ? raw.numericValue : null);
+    : typeof raw.numericValue === "number" && Number.isFinite(raw.numericValue)
+      ? raw.numericValue
+      : null;
 
-  const refLow = typeof raw.referenceLow === "number" && Number.isFinite(raw.referenceLow) ? raw.referenceLow : null;
-  const refHigh = typeof raw.referenceHigh === "number" && Number.isFinite(raw.referenceHigh) ? raw.referenceHigh : null;
+  const refLow =
+    typeof raw.referenceLow === "number" && Number.isFinite(raw.referenceLow)
+      ? raw.referenceLow
+      : null;
+  const refHigh =
+    typeof raw.referenceHigh === "number" && Number.isFinite(raw.referenceHigh)
+      ? raw.referenceHigh
+      : null;
   const refText = String(raw.referenceText || "").trim();
 
   // Rule 2: Never convert an invalid/uncertain AI flag into "normal"
   let flag: "normal" | "high" | "low" | "abnormal" | "unknown" = "unknown";
-  const rawFlag = String(raw.flag || "").toLowerCase().trim();
+  const rawFlag = String(raw.flag || "")
+    .toLowerCase()
+    .trim();
 
   if (rawFlag === "high" || rawFlag === "low" || rawFlag === "abnormal") {
-    flag = rawFlag as any;
+    flag = rawFlag;
   } else if (num !== null && (refLow !== null || refHigh !== null)) {
     if (refLow !== null && num < refLow) flag = "low";
     else if (refHigh !== null && num > refHigh) flag = "high";
-    else if (refLow !== null && refHigh !== null && num >= refLow && num <= refHigh) flag = "normal";
+    else if (refLow !== null && refHigh !== null && num >= refLow && num <= refHigh)
+      flag = "normal";
     else if (refLow !== null && refHigh === null && num >= refLow) flag = "normal";
     else if (refLow === null && refHigh !== null && num <= refHigh) flag = "normal";
   } else if (/positive|reactive|present/i.test(rawResultVal)) {
@@ -676,7 +755,11 @@ export function validateMedicalCandidate(
 
   // Field-level ambiguity tracking
   const ambiguousFields: AmbiguousFieldType[] = Array.isArray(raw.ambiguousFields)
-    ? raw.ambiguousFields.filter((f: any) => ["testName", "resultValue", "unit", "referenceRange", "flag"].includes(f))
+    ? (raw.ambiguousFields as unknown[]).filter(
+        (f): f is AmbiguousFieldType =>
+          typeof f === "string" &&
+          ["testName", "resultValue", "unit", "referenceRange", "flag"].includes(f),
+      )
     : [];
 
   let isAmbiguous = Boolean(raw.isAmbiguous);
@@ -685,13 +768,15 @@ export function validateMedicalCandidate(
   if (/[_~|\\{}[\]]/.test(rawTestName) || rawTestName.length < 3) {
     if (!ambiguousFields.includes("testName")) ambiguousFields.push("testName");
     isAmbiguous = true;
-    if (!ambiguityReason) ambiguityReason = "Test name contains OCR artifacts or unclear characters";
+    if (!ambiguityReason)
+      ambiguityReason = "Test name contains OCR artifacts or unclear characters";
   }
 
   if (/[oOlI]/.test(rawResultVal) && /\d/.test(rawResultVal)) {
     if (!ambiguousFields.includes("resultValue")) ambiguousFields.push("resultValue");
     isAmbiguous = true;
-    if (!ambiguityReason) ambiguityReason = "Value contains possible letter-number OCR confusion (e.g. O instead of 0)";
+    if (!ambiguityReason)
+      ambiguityReason = "Value contains possible letter-number OCR confusion (e.g. O instead of 0)";
   }
 
   if (isAmbiguous && ambiguousFields.length === 0) {
@@ -734,14 +819,47 @@ export function extractCandidatesLocally(
   pages: Array<{ page: number; text: string; confidence?: number | null }>,
 ): StructuredBiomarkerCandidate[] {
   const UNIT_PATTERNS = [
-    "mg/dL", "mg/dl", "g/dL", "g/dl", "mmol/L", "mmol/l", "IU/mL", "IU/ml",
-    "U/L", "u/l", "ng/mL", "ng/ml", "pg/mL", "µg/dL", "mcg/dL", "%", "mmHg",
-    "cells/µL", "cells/cumm", "10^3/µL", "/µL", "fL", "pg", "mIU/L", "uIU/mL",
+    "mg/dL",
+    "mg/dl",
+    "g/dL",
+    "g/dl",
+    "mmol/L",
+    "mmol/l",
+    "IU/mL",
+    "IU/ml",
+    "U/L",
+    "u/l",
+    "ng/mL",
+    "ng/ml",
+    "pg/mL",
+    "µg/dL",
+    "mcg/dL",
+    "%",
+    "mmHg",
+    "cells/µL",
+    "cells/cumm",
+    "10^3/µL",
+    "/µL",
+    "fL",
+    "pg",
+    "mIU/L",
+    "uIU/mL",
+    "ODRatio",
+    "OD Ratio",
+    "Index",
+    "Ratio",
+    "odratio",
+    "index",
   ];
-  const unitRegexPart = UNIT_PATTERNS.map((u) => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-  const metadataNoiseRegex = /^(patient|name|age|gender|sex|date|doctor|referred|specimen|sample|barcode|reg|mrn|lab|hospital|page|report|phone|email|address|consultant|pathologist|signature|disclaimer|biological|abnormal|normal|reference|units?|method|department)\b/i;
-  const tableHeaderNoiseRegex = /^(test\s*name|investigation|parameter|analyte|test\s*description)[\s|:]+(result|value|observed|findings)/i;
-  const testNamePrefixRegex = /^(total|direct|indirect|fasting|post\s*prandial|serum|blood|urine|mean|red\s*cell|white\s*blood|absolute)\s*$/i;
+  const unitRegexPart = UNIT_PATTERNS.map((u) => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(
+    "|",
+  );
+  const metadataNoiseRegex =
+    /^(patient|name|age|gender|sex|date|doctor|referred|specimen|sample|barcode|reg|mrn|lab|hospital|page|report|phone|email|address|consultant|pathologist|signature|disclaimer|biological|abnormal|normal|reference|units?|method|department)\b/i;
+  const tableHeaderNoiseRegex =
+    /^(test\s*name|investigation|parameter|analyte|test\s*description)[\s|:]+(result|value|observed|findings)/i;
+  const testNamePrefixRegex =
+    /^(total|direct|indirect|fasting|post\s*prandial|serum|blood|urine|mean|red\s*cell|white\s*blood|absolute)\s*$/i;
 
   const results: StructuredBiomarkerCandidate[] = [];
   const seenTests = new Set<string>();
@@ -749,7 +867,10 @@ export function extractCandidatesLocally(
   for (const p of pages) {
     const pageNum = p.page || 1;
     const text = p.text || "";
-    const rawLines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    const rawLines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
 
     const lines: string[] = [];
     for (let i = 0; i < rawLines.length; i++) {
@@ -757,7 +878,10 @@ export function extractCandidatesLocally(
 
       // Check if current line is a wrapped test name prefix e.g. "Total" or "Fasting Blood"
       if (
-        (testNamePrefixRegex.test(current) || (/^[a-zA-Z\s]{2,20}$/.test(current) && !/\d/.test(current) && !metadataNoiseRegex.test(current))) &&
+        (testNamePrefixRegex.test(current) ||
+          (/^[a-zA-Z\s]{2,20}$/.test(current) &&
+            !/\d/.test(current) &&
+            !metadataNoiseRegex.test(current))) &&
         i + 1 < rawLines.length
       ) {
         const next = rawLines[i + 1]!;
@@ -783,8 +907,12 @@ export function extractCandidatesLocally(
     for (const rawLine of lines) {
       if (rawLine.length < 3) continue;
 
-      if (/^(complete blood count|cbc|lipid profile|liver function|renal function|renal profile|kidney function|thyroid profile|urine routine|urine analysis|biochemistry|haematology|hematology|serology)\b/i.test(rawLine)) {
-        currentSection = rawLine.replace(/[:\-]/g, "").trim();
+      if (
+        /^(complete blood count|cbc|lipid profile|liver function|renal function|renal profile|kidney function|thyroid profile|urine routine|urine analysis|biochemistry|haematology|hematology|serology)\b/i.test(
+          rawLine,
+        )
+      ) {
+        currentSection = rawLine.replace(/[:-]/g, "").trim();
         continue;
       }
 
@@ -811,7 +939,9 @@ export function extractCandidatesLocally(
 
       const resultValue = (m[2] || "").trim();
       const cleanNumStr = resultValue.replace(/,/g, "").replace(/^[<>]=?\s*/, "");
-      const numericVal = /^-?\d+(\.\d+)?$/.test(cleanNumStr) ? Number.parseFloat(cleanNumStr) : null;
+      const numericVal = /^-?\d+(\.\d+)?$/.test(cleanNumStr)
+        ? Number.parseFloat(cleanNumStr)
+        : null;
       const unit = (m[3] || "").trim();
       const tail = (m[4] || "").trim();
 
@@ -820,21 +950,26 @@ export function extractCandidatesLocally(
       let refText = "";
 
       const numGroup = `(?:\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)`;
-      const rangeMatch = new RegExp(`(${numGroup})\\s*[-–to]{1,2}\\s*(${numGroup})`, "i").exec(tail);
+      const rangeMatch = new RegExp(`(${numGroup})\\s*[-–to]{1,2}\\s*(${numGroup})`, "i").exec(
+        tail,
+      );
       const upperOnlyMatch = new RegExp(`(?:<|less than|up to)\\s*(${numGroup})`, "i").exec(tail);
       const lowerOnlyMatch = new RegExp(`(?:>|greater than)\\s*(${numGroup})`, "i").exec(tail);
 
-      if (rangeMatch) {
+      if (rangeMatch && rangeMatch[1] && rangeMatch[2]) {
         refLow = Number.parseFloat(rangeMatch[1].replace(/,/g, ""));
         refHigh = Number.parseFloat(rangeMatch[2].replace(/,/g, ""));
         refText = rangeMatch[0];
-      } else if (upperOnlyMatch) {
+      } else if (upperOnlyMatch && upperOnlyMatch[1]) {
         refHigh = Number.parseFloat(upperOnlyMatch[1].replace(/,/g, ""));
         refText = upperOnlyMatch[0];
-      } else if (lowerOnlyMatch) {
+      } else if (lowerOnlyMatch && lowerOnlyMatch[1]) {
         refLow = Number.parseFloat(lowerOnlyMatch[1].replace(/,/g, ""));
         refText = lowerOnlyMatch[0];
-      } else if (tail.length > 0 && tail.length < 30 && /\d/.test(tail)) {
+      } else if (/\b(negative|non-reactive|nonreactive|absent|nil)\b/i.test(tail)) {
+        const qualMatch = /\b(negative|non-reactive|nonreactive|absent|nil)\b/i.exec(tail);
+        refText = qualMatch && qualMatch[0] ? qualMatch[0] : "Negative";
+      } else if (tail.length > 0 && tail.length < 40) {
         refText = tail;
       }
 
@@ -846,13 +981,28 @@ export function extractCandidatesLocally(
       } else if (numericVal !== null && (refLow !== null || refHigh !== null)) {
         if (refLow !== null && numericVal < refLow) flag = "low";
         else if (refHigh !== null && numericVal > refHigh) flag = "high";
-        else if (refLow !== null && refHigh !== null && numericVal >= refLow && numericVal <= refHigh) flag = "normal";
+        else if (
+          refLow !== null &&
+          refHigh !== null &&
+          numericVal >= refLow &&
+          numericVal <= refHigh
+        )
+          flag = "normal";
         else if (refLow !== null && refHigh === null && numericVal >= refLow) flag = "normal";
         else if (refLow === null && refHigh !== null && numericVal <= refHigh) flag = "normal";
       } else if (/positive|reactive|present/i.test(resultValue)) {
         flag = "abnormal";
       } else if (/negative|non-reactive|absent|nil/i.test(resultValue)) {
         flag = "normal";
+      } else if (
+        /\b(negative|non-reactive|nonreactive|absent|nil)\b/i.test(refText) &&
+        numericVal !== null
+      ) {
+        if (refHigh !== null) {
+          flag = numericVal <= refHigh ? "normal" : "abnormal";
+        } else {
+          flag = "normal";
+        }
       }
 
       const valRes = validateMedicalCandidate(
@@ -927,13 +1077,20 @@ export async function understandMedicalReport(
         for (const raw of rawResults) {
           const valRes = validateMedicalCandidate(raw);
           if (valRes.valid && valRes.candidate) {
-            const grounded = reconcileWithSourceOcr(valRes.candidate, pages);
+            const grounded =
+              raw.groundingStatus && raw.sourceRegion
+                ? {
+                    ...valRes.candidate,
+                    groundingStatus: raw.groundingStatus,
+                    sourceRegion: raw.sourceRegion,
+                  }
+                : reconcileWithSourceOcr(valRes.candidate, pages);
             if (
               grounded.groundingStatus?.testName === "unsupported" &&
               grounded.groundingStatus?.resultValue === "unsupported"
             ) {
               rejectedReasons.push(
-                `Ungrounded AI hallucination rejected: "${grounded.testName}" with value "${grounded.resultValue}" has no support in source OCR.`
+                `Ungrounded AI hallucination rejected: "${grounded.testName}" with value "${grounded.resultValue}" has no support in source OCR.`,
               );
               continue;
             }

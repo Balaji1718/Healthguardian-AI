@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2, FileText, Image as ImageIcon, Loader2, ScanLine, Trash2, Upload } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  ScanLine,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -28,6 +37,7 @@ import {
 } from "@/services/ai/document-understanding";
 import { ReportVerificationPanel } from "@/features/reports/ReportVerificationPanel";
 import {
+  checkinIdForDate,
   createReport,
   deleteReport,
   saveResult,
@@ -81,7 +91,7 @@ export function ReportsPage() {
   const [meta, setMeta] = useState({
     reportTitle: "",
     reportType: "blood_test",
-    reportDate: new Date().toISOString().slice(0, 10),
+    reportDate: checkinIdForDate(new Date()),
     laboratoryName: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -139,12 +149,16 @@ export function ReportsPage() {
 
       // Phase 2: Semantic Document Understanding & Table Reconstruction
       setProgress(55);
-      setProgressLabel(t("reports.understandingStructure") || "Understanding report structure & table layout...");
+      setProgressLabel(
+        t("reports.understandingStructure") || "Understanding report structure & table layout...",
+      );
       const docOutcome = await understandMedicalReport(outcome.pages, meta);
 
       // Phase 3: Organizing & Checking
       setProgress(85);
-      setProgressLabel(t("reports.organizingResults") || "Checking extracted information & preparing review...");
+      setProgressLabel(
+        t("reports.organizingResults") || "Checking extracted information & preparing review...",
+      );
 
       setCandidates(docOutcome.candidates);
       setParsedSections(docOutcome.sections || []);
@@ -185,13 +199,10 @@ export function ReportsPage() {
     try {
       const confirmedResults: MedicalResult[] = [];
       for (const c of confirmed) {
-        const flag = c.flag && c.flag !== "unknown"
-          ? c.flag
-          : computeFlag(
-              c.numericValue ?? null,
-              c.referenceLow ?? null,
-              c.referenceHigh ?? null,
-            );
+        const flag =
+          c.flag && c.flag !== "unknown"
+            ? c.flag
+            : computeFlag(c.numericValue ?? null, c.referenceLow ?? null, c.referenceHigh ?? null);
         const resObj: MedicalResult = {
           ...c,
           flag,
@@ -204,7 +215,13 @@ export function ReportsPage() {
 
       // Synchronize atomically into canonical healthRecords collection!
       const reportDate = new Date(`${meta.reportDate}T00:00:00`);
-      await syncReportToHealthRecords(uid, activeReport, reportDate, confirmedResults, meta.reportTitle);
+      await syncReportToHealthRecords(
+        uid,
+        activeReport,
+        reportDate,
+        confirmedResults,
+        meta.reportTitle,
+      );
 
       await updateReport(uid, activeReport, {
         verificationStatus: "verified",

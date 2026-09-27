@@ -25,7 +25,8 @@ async function db(): Promise<IDBPDatabase | null> {
           if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
           if (!d.objectStoreNames.contains(CACHE)) d.createObjectStore(CACHE);
           if (!d.objectStoreNames.contains(STORE_HANDLES)) d.createObjectStore(STORE_HANDLES);
-          if (!d.objectStoreNames.contains(STORE_METADATA)) d.createObjectStore(STORE_METADATA, { keyPath: "name" });
+          if (!d.objectStoreNames.contains(STORE_METADATA))
+            d.createObjectStore(STORE_METADATA, { keyPath: "name" });
         },
       });
       // Test connectivity
@@ -194,7 +195,9 @@ export async function cacheClear(uid: string) {
     const d = await db();
     if (d) {
       const keys = await d.getAllKeys(CACHE);
-      await Promise.all(keys.filter((k) => String(k).startsWith(uid)).map((k) => d.delete(CACHE, k)));
+      await Promise.all(
+        keys.filter((k) => String(k).startsWith(uid)).map((k) => d.delete(CACHE, k)),
+      );
     }
   } catch {
     // best-effort

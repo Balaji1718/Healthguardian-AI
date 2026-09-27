@@ -42,13 +42,51 @@ export function History() {
   const uid = useUid();
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useCheckins(uid, 120);
-  const { data: healthRecordsData, isLoading: isLoadingRecords, isError: isErrorRecords, refetch: refetchRecords } = useHealthRecords(uid, undefined, 200);
+  const {
+    data: healthRecordsData,
+    isLoading: isLoadingRecords,
+    isError: isErrorRecords,
+    refetch: refetchRecords,
+  } = useHealthRecords(uid, undefined, 200);
 
   const [activeTab, setActiveTab] = useState<"checkins" | "biomarkers">("checkins");
   const [selectedBiomarker, setSelectedBiomarker] = useState<string>("all");
   const [metric, setMetric] = useState<
     "sleepHours" | "waterGlasses" | "exerciseMinutes" | "weightKg" | "systolicBP" | "bloodGlucose"
   >("sleepHours");
+
+  const labRecords = useMemo(() => {
+    return (healthRecordsData ?? []).filter((r) =>
+      Boolean(r && r.sourceType === "medical_report" && r.metric),
+    );
+  }, [healthRecordsData]);
+
+  const uniqueBiomarkers = useMemo(() => {
+    return Array.from(new Set(labRecords.map((r) => r.metric)));
+  }, [labRecords]);
+
+  const filteredLabRecords = useMemo(() => {
+    if (selectedBiomarker === "all") return labRecords;
+    return labRecords.filter((r) => r.metric === selectedBiomarker);
+  }, [labRecords, selectedBiomarker]);
+
+  const biomarkerChartPoints = useMemo(() => {
+    if (selectedBiomarker === "all") return [];
+    return [...filteredLabRecords]
+      .reverse()
+      .map((r) => {
+        const d = r?.recordedAt ? toDate(r.recordedAt) : null;
+        const formattedDate =
+          d instanceof Date && !isNaN(d.getTime())
+            ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+            : "";
+        return {
+          date: formattedDate,
+          value: typeof r?.numericValue === "number" ? r.numericValue : null,
+        };
+      })
+      .filter((p) => typeof p.value === "number");
+  }, [filteredLabRecords, selectedBiomarker]);
 
   if (isLoading || isLoadingRecords) return <LoadingState label={t("common.loading")} />;
   if (isError || isErrorRecords) {
@@ -67,9 +105,10 @@ export function History() {
     .reverse()
     .map((c) => {
       const d = c?.date ? toDate(c.date) : null;
-      const formattedDate = d instanceof Date && !isNaN(d.getTime())
-        ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-        : "";
+      const formattedDate =
+        d instanceof Date && !isNaN(d.getTime())
+          ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+          : "";
       return {
         date: formattedDate,
         value: typeof c[metric] === "number" ? c[metric] : null,
@@ -85,36 +124,6 @@ export function History() {
     { key: "systolicBP", label: t("dashboard.bloodPressure") },
     { key: "bloodGlucose", label: t("dashboard.bloodGlucose") },
   ] as const;
-
-  const labRecords = useMemo(() => {
-    return (healthRecordsData ?? []).filter((r) => Boolean(r && r.sourceType === "medical_report" && r.metric));
-  }, [healthRecordsData]);
-
-  const uniqueBiomarkers = useMemo(() => {
-    return Array.from(new Set(labRecords.map((r) => r.metric)));
-  }, [labRecords]);
-
-  const filteredLabRecords = useMemo(() => {
-    if (selectedBiomarker === "all") return labRecords;
-    return labRecords.filter((r) => r.metric === selectedBiomarker);
-  }, [labRecords, selectedBiomarker]);
-
-  const biomarkerChartPoints = useMemo(() => {
-    if (selectedBiomarker === "all") return [];
-    return [...filteredLabRecords]
-      .reverse()
-      .map((r) => {
-        const d = r?.recordedAt ? toDate(r.recordedAt) : null;
-        const formattedDate = d instanceof Date && !isNaN(d.getTime())
-          ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-          : "";
-        return {
-          date: formattedDate,
-          value: typeof r?.numericValue === "number" ? r.numericValue : null,
-        };
-      })
-      .filter((p) => typeof p.value === "number");
-  }, [filteredLabRecords, selectedBiomarker]);
 
   const getSourceLabel = (src?: string) => {
     switch (src) {
@@ -136,15 +145,29 @@ export function History() {
   const getFlagBadge = (flag?: string) => {
     switch (flag) {
       case "high":
-        return <Badge className="bg-destructive/15 text-destructive border-destructive/30">High</Badge>;
+        return (
+          <Badge className="bg-destructive/15 text-destructive border-destructive/30">High</Badge>
+        );
       case "low":
-        return <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">Low</Badge>;
+        return (
+          <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+            Low
+          </Badge>
+        );
       case "abnormal":
-        return <Badge className="bg-destructive/15 text-destructive border-destructive/30">Abnormal</Badge>;
+        return (
+          <Badge className="bg-destructive/15 text-destructive border-destructive/30">
+            Abnormal
+          </Badge>
+        );
       case "normal":
         return <Badge className="bg-success/15 text-success border-success/30">Normal</Badge>;
       default:
-        return <Badge variant="outline" className="text-muted-foreground text-[10px]">Normal</Badge>;
+        return (
+          <Badge variant="outline" className="text-muted-foreground text-[10px]">
+            Normal
+          </Badge>
+        );
     }
   };
 
@@ -161,7 +184,7 @@ export function History() {
             "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer",
             activeTab === "checkins"
               ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/60"
+              : "text-muted-foreground hover:bg-muted/60",
           )}
         >
           <Activity className="size-4" />
@@ -175,7 +198,7 @@ export function History() {
             "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer",
             activeTab === "biomarkers"
               ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/60"
+              : "text-muted-foreground hover:bg-muted/60",
           )}
         >
           <FileText className="size-4" />
@@ -289,133 +312,140 @@ export function History() {
             </section>
           </>
         )
+      ) : /* Verified Lab Biomarkers Tab */
+      labRecords.length === 0 ? (
+        <EmptyState
+          title="No Verified Lab Biomarkers Yet"
+          description="Verified clinical biomarkers will automatically appear here once you review and confirm an uploaded medical report."
+        />
       ) : (
-        /* Verified Lab Biomarkers Tab */
-        labRecords.length === 0 ? (
-          <EmptyState
-            title="No Verified Lab Biomarkers Yet"
-            description="Verified clinical biomarkers will automatically appear here once you review and confirm an uploaded medical report."
-          />
-        ) : (
-          <div className="space-y-4">
-            {/* Biomarker filter pills */}
-            {uniqueBiomarkers.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedBiomarker("all")}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer",
-                    selectedBiomarker === "all"
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "hover:bg-muted text-muted-foreground",
-                  )}
-                >
-                  All Biomarkers ({labRecords.length})
-                </button>
-                {uniqueBiomarkers.map((bio) => {
-                  const count = labRecords.filter((r) => r.metric === bio).length;
-                  return (
-                    <button
-                      key={bio}
-                      type="button"
-                      onClick={() => setSelectedBiomarker(bio)}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer",
-                        selectedBiomarker === bio
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "hover:bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {bio} ({count})
-                    </button>
-                  );
-                })}
+        <div className="space-y-4">
+          {/* Biomarker filter pills */}
+          {uniqueBiomarkers.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedBiomarker("all")}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer",
+                  selectedBiomarker === "all"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground",
+                )}
+              >
+                All Biomarkers ({labRecords.length})
+              </button>
+              {uniqueBiomarkers.map((bio) => {
+                const count = labRecords.filter((r) => r.metric === bio).length;
+                return (
+                  <button
+                    key={bio}
+                    type="button"
+                    onClick={() => setSelectedBiomarker(bio)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer",
+                      selectedBiomarker === bio
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "hover:bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {bio} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Longitudinal Chart for Selected Biomarker */}
+          {selectedBiomarker !== "all" && biomarkerChartPoints.length >= 2 && (
+            <section className="surface p-4 rounded-2xl border">
+              <div className="mb-2">
+                <h3 className="font-semibold text-sm text-foreground">{selectedBiomarker} Trend</h3>
+                <p className="text-xs text-muted-foreground">
+                  Longitudinal values from your confirmed medical reports.
+                </p>
               </div>
-            )}
-
-            {/* Longitudinal Chart for Selected Biomarker */}
-            {selectedBiomarker !== "all" && biomarkerChartPoints.length >= 2 && (
-              <section className="surface p-4 rounded-2xl border">
-                <div className="mb-2">
-                  <h3 className="font-semibold text-sm text-foreground">{selectedBiomarker} Trend</h3>
-                  <p className="text-xs text-muted-foreground">Longitudinal values from your confirmed medical reports.</p>
-                </div>
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={biomarkerChartPoints} margin={{ top: 10, right: 12, bottom: 0, left: -18 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--color-card)",
-                          border: "1px solid var(--color-border)",
-                          borderRadius: "0.75rem",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="var(--color-chart-2)"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-            )}
-
-            {/* Biomarker Table */}
-            <section className="surface overflow-x-auto rounded-2xl border">
-              <table className="w-full text-sm">
-                <thead className="border-b bg-muted/50 text-left">
-                  <tr>
-                    <th className="px-4 py-2.5 font-medium">Date</th>
-                    <th className="px-4 py-2.5 font-medium">Test / Biomarker</th>
-                    <th className="px-4 py-2.5 font-medium">Value</th>
-                    <th className="px-4 py-2.5 font-medium">Unit</th>
-                    <th className="px-4 py-2.5 font-medium">Reference Interval</th>
-                    <th className="px-4 py-2.5 font-medium">Status</th>
-                    <th className="px-4 py-2.5 font-medium">Source Document</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLabRecords.map((r) => (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-2.5 font-medium text-xs text-muted-foreground whitespace-nowrap">
-                        {toDate(r.recordedAt)?.toLocaleDateString() ?? "—"}
-                      </td>
-                      <td className="px-4 py-2.5 font-semibold text-foreground">
-                        {r.metric}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono font-bold text-foreground">
-                        {r.valueText || r.numericValue || "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        {r.unit || "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        {r.referenceText || (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : "—")}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {getFlagBadge(r.flag)}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <FileText className="size-3 text-primary" />
-                          <span className="truncate max-w-[150px]">{r.sourceName || "Medical Report"}</span>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={biomarkerChartPoints}
+                    margin={{ top: 10, right: 12, bottom: 0, left: -18 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
+                    <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--color-card)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "0.75rem",
+                        fontSize: 12,
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="var(--color-chart-2)"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </section>
-          </div>
-        )
+          )}
+
+          {/* Biomarker Table */}
+          <section className="surface overflow-x-auto rounded-2xl border">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/50 text-left">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Date</th>
+                  <th className="px-4 py-2.5 font-medium">Test / Biomarker</th>
+                  <th className="px-4 py-2.5 font-medium">Value</th>
+                  <th className="px-4 py-2.5 font-medium">Unit</th>
+                  <th className="px-4 py-2.5 font-medium">Reference Interval</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">Source Document</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLabRecords.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="px-4 py-2.5 font-medium text-xs text-muted-foreground whitespace-nowrap">
+                      {toDate(r.recordedAt)?.toLocaleDateString() ?? "—"}
+                    </td>
+                    <td className="px-4 py-2.5 font-semibold text-foreground">{r.metric}</td>
+                    <td className="px-4 py-2.5 font-mono font-bold text-foreground">
+                      {r.valueText || r.numericValue || "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.unit || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      {r.referenceText ||
+                        (r.referenceLow != null ? `${r.referenceLow} - ${r.referenceHigh}` : "—")}
+                    </td>
+                    <td className="px-4 py-2.5">{getFlagBadge(r.flag)}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <FileText className="size-3 text-primary" />
+                        <span className="truncate max-w-[150px]">
+                          {r.sourceName || "Medical Report"}
+                        </span>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </div>
       )}
 
       <Disclaimer />

@@ -1,13 +1,30 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, Heart, Loader2, Mail } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Heart,
+  KeyRound,
+  Loader2,
+  Mail,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authSchema, registerSchema } from "@/core/validation/schemas";
-import { login, register, resetPassword } from "@/services/firebase/auth";
+import {
+  login,
+  register,
+  sendPasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetPasswordWithToken,
+} from "@/services/firebase/auth";
 import { isFirebaseConfigured } from "@/services/firebase/config";
 import { FirebaseSetupNotice } from "@/components/common/FirebaseSetupNotice";
 import { useAuthListener } from "@/features/auth/useAuth";
@@ -58,7 +75,16 @@ function AuthPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+
+  // Email OTP recovery state
+  const [forgotStep, setForgotStep] = useState<"email" | "otp" | "password">("email");
+  const [otpCode, setOtpCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resetSessionToken, setResetSessionToken] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     if (mode) setAuthMode(mode);
@@ -70,6 +96,15 @@ function AuthPage() {
     }
   }, [loading, user, navigate]);
 
+  // Cooldown countdown timer for OTP requests
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
   if (!isFirebaseConfigured) return <FirebaseSetupNotice />;
 
   if (loading || user) {
@@ -80,9 +115,14 @@ function AuthPage() {
 
   const changeMode = (next: "login" | "register" | "forgot") => {
     setAuthMode(next);
+    setForgotStep("email");
+    setOtpCode("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setResetSessionToken(null);
     setErrors({});
     setShowPassword(false);
-    setResetSent(false);
+    setShowNewPassword(false);
     void navigate({
       to: "/auth",
       search: { mode: next },
@@ -119,8 +159,9 @@ function AuthPage() {
     }
   };
 
-  const submitForgot = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Step 1: Send OTP to email
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const email = form.email.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrors({ email: t("auth.invalidEmail") });
@@ -129,9 +170,87 @@ function AuthPage() {
     setErrors({});
     setBusy(true);
     try {
-      await resetPassword(email);
-      setResetSent(true);
-      toast.success(t("auth.resetEmailSent"));
+      const res = await sendPasswordResetOtp(email);
+      if (!res.ok) {
+        if (res.cooldownRemainingSeconds) {
+          setCooldownSeconds(res.cooldownRemainingSeconds);
+        }
+        toast.error(res.error || "Unable to send verification code. Please try again.");
+        return;
+      }
+      setCooldownSeconds(60);
+      setForgotStep("otp");
+      toast.success(res.message || t("auth.otpSentNotice"));
+    } catch (err) {
+      toast.error(friendlyError(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Step 2: Verify 6-digit OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanOtp = otpCode.trim();
+    if (!/^\d{6}$/.test(cleanOtp)) {
+      setErrors({ otp: "Please enter the 6-digit verification code." });
+      return;
+    }
+    setErrors({});
+    setBusy(true);
+    try {
+      const res = await verifyPasswordResetOtp(form.email.trim(), cleanOtp);
+      if (!res.ok || !res.resetSessionToken) {
+        if (res.attemptsLeft !== undefined) {
+          setAttemptsRemaining(res.attemptsLeft);
+        }
+        toast.error(res.error || "Invalid verification code.");
+        return;
+      }
+      setResetSessionToken(res.resetSessionToken);
+      setForgotStep("password");
+      toast.success(res.message || "Code verified successfully.");
+    } catch (err) {
+      toast.error(friendlyError(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Step 3: Set new password using single-use reset token
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetSessionToken) {
+      toast.error("Session expired. Please request a new verification code.");
+      setForgotStep("email");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrors({ newPassword: "Password must be at least 8 characters long." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrors({ confirmPassword: t("auth.passwordMismatch") });
+      return;
+    }
+    setErrors({});
+    setBusy(true);
+    try {
+      const res = await resetPasswordWithToken(resetSessionToken, newPassword);
+      if (!res.ok) {
+        toast.error(res.error || "Password reset failed. Please start again.");
+        setForgotStep("email");
+        return;
+      }
+      toast.success(t("auth.passwordResetSuccess"));
+      // Transition back to login mode with email preserved
+      setAuthMode("login");
+      setForgotStep("email");
+      setOtpCode("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setResetSessionToken(null);
+      void navigate({ to: "/auth", search: { mode: "login" }, replace: true });
     } catch (err) {
       toast.error(friendlyError(err, t));
     } finally {
@@ -160,58 +279,188 @@ function AuthPage() {
                 <ArrowLeft className="size-3.5" /> {t("auth.backToSignIn")}
               </button>
 
-              <div>
-                <h1 className="text-xl font-semibold text-foreground">
-                  {t("auth.forgotPassword")}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Enter your email to receive password recovery instructions.
-                </p>
-              </div>
-
-              {resetSent ? (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
-                    <CheckCircle2 className="size-4" /> Recovery Email Sent
+              {/* Step 1: Request OTP */}
+              {forgotStep === "email" && (
+                <div className="space-y-4">
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground">
+                      {t("auth.forgotPassword")}
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Enter your email to receive a secure 6-digit verification code.
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {t("auth.resetEmailSent")}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-xs"
-                    onClick={() => changeMode("login")}
-                  >
-                    {t("auth.backToSignIn")}
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={submitForgot} className="space-y-4" noValidate>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="forgot-email">{t("auth.email")}</Label>
-                    <div className="relative">
-                      <Input
-                        id="forgot-email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="name@example.com"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        className="pr-10"
-                      />
-                      <Mail className="absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground pointer-events-none" />
+
+                  <form onSubmit={handleSendOtp} className="space-y-4" noValidate>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="forgot-email">{t("auth.email")}</Label>
+                      <div className="relative">
+                        <Input
+                          id="forgot-email"
+                          type="email"
+                          autoComplete="email"
+                          placeholder="name@example.com"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          className="pr-10"
+                        />
+                        <Mail className="absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                      {errors["email"] && (
+                        <p className="text-xs text-destructive">{errors["email"]}</p>
+                      )}
                     </div>
-                    {errors["email"] && (
-                      <p className="text-xs text-destructive">{errors["email"]}</p>
-                    )}
+
+                    <Button type="submit" className="w-full" disabled={busy || cooldownSeconds > 0}>
+                      {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      {cooldownSeconds > 0
+                        ? `Wait ${cooldownSeconds}s to resend`
+                        : t("auth.sendOtp")}
+                    </Button>
+                  </form>
+                </div>
+              )}
+
+              {/* Step 2: Enter 6-digit OTP */}
+              {forgotStep === "otp" && (
+                <div className="space-y-4">
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <KeyRound className="size-5 text-primary" /> {t("auth.verifyOtp")}
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("auth.otpSentNotice")}{" "}
+                      <span className="font-medium text-foreground">{form.email}</span>.
+                    </p>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={busy}>
-                    {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {t("auth.sendResetEmail")}
-                  </Button>
-                </form>
+                  <form onSubmit={handleVerifyOtp} className="space-y-4" noValidate>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="otp-input">{t("auth.otpCode")}</Label>
+                      <Input
+                        id="otp-input"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        autoFocus
+                        placeholder="••••••"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        className="text-center font-mono text-2xl tracking-[0.3em] font-semibold h-12"
+                      />
+                      {errors["otp"] && <p className="text-xs text-destructive">{errors["otp"]}</p>}
+                      {attemptsRemaining !== null && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          {attemptsRemaining} {attemptsRemaining === 1 ? "attempt" : "attempts"}{" "}
+                          remaining before code lockout.
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={busy || otpCode.length !== 6}
+                    >
+                      {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      {t("auth.verifyOtp")}
+                    </Button>
+
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setForgotStep("email")}
+                        className="text-muted-foreground hover:text-foreground underline cursor-pointer"
+                      >
+                        Change email
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSendOtp()}
+                        disabled={busy || cooldownSeconds > 0}
+                        className={`inline-flex items-center gap-1 font-medium cursor-pointer ${
+                          cooldownSeconds > 0
+                            ? "text-muted-foreground cursor-not-allowed opacity-60"
+                            : "text-primary hover:underline"
+                        }`}
+                      >
+                        <RefreshCw className="size-3" />
+                        {cooldownSeconds > 0
+                          ? `Resend in ${cooldownSeconds}s`
+                          : t("auth.resendOtp")}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Step 3: Enter New Password */}
+              {forgotStep === "password" && (
+                <div className="space-y-4">
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                      <ShieldCheck className="size-5 text-primary" /> {t("auth.setNewPassword")}
+                    </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Enter a new secure password with at least 8 characters.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleResetPassword} className="space-y-4" noValidate>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="new-password">{t("auth.newPassword")}</Label>
+                      <div className="relative">
+                        <Input
+                          id="new-password"
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="At least 8 characters"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute inset-y-0 right-3 my-auto text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </button>
+                      </div>
+                      {errors["newPassword"] && (
+                        <p className="text-xs text-destructive">{errors["newPassword"]}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirm-new-password">{t("auth.confirmPassword")}</Label>
+                      <Input
+                        id="confirm-new-password"
+                        type={showNewPassword ? "text" : "password"}
+                        placeholder="Re-enter your password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                      />
+                      {errors["confirmPassword"] && (
+                        <p className="text-xs text-destructive">{errors["confirmPassword"]}</p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={busy || newPassword.length < 8}
+                    >
+                      {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      {t("auth.setNewPassword")}
+                    </Button>
+                  </form>
+                </div>
               )}
             </div>
           ) : (

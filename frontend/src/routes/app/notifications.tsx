@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, BellRing, Check, CheckCheck, Clock, Filter, Inbox, Info, Smartphone, Trash2 } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  BellRing,
+  Check,
+  CheckCheck,
+  Clock,
+  Filter,
+  Inbox,
+  Info,
+  Smartphone,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/AppShell";
 import { Disclaimer, EmptyState, ErrorState, LoadingState } from "@/components/common/States";
@@ -169,13 +181,19 @@ export function NotificationsPage() {
           )}
 
           {notificationState === "denied" && (
-            <Badge variant="outline" className="text-[11px] text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5 gap-1">
+            <Badge
+              variant="outline"
+              className="text-[11px] text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5 gap-1"
+            >
               <BellOff className="size-3" /> Blocked in browser
             </Badge>
           )}
 
           {(notificationState === "granted_local" || notificationState === "fcm_active") && (
-            <Badge variant="outline" className="text-[11px] text-success border-success/30 bg-success/5 gap-1">
+            <Badge
+              variant="outline"
+              className="text-[11px] text-success border-success/30 bg-success/5 gap-1"
+            >
               <Check className="size-3" /> Alerts active
             </Badge>
           )}
@@ -189,7 +207,10 @@ export function NotificationsPage() {
           <div className="space-y-0.5">
             <p className="font-semibold text-foreground">Device notifications are blocked</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Browser alerts have been declined or blocked in your site settings. HealthGuardian will continue to display all reminders and notifications directly in the list below. To receive device lock-screen alerts, please enable notifications in your browser's site settings.
+              Browser alerts have been declined or blocked in your site settings. HealthGuardian
+              will continue to display all reminders and notifications directly in the list below.
+              To receive device lock-screen alerts, please enable notifications in your browser's
+              site settings.
             </p>
           </div>
         </div>
@@ -201,7 +222,9 @@ export function NotificationsPage() {
           <div className="space-y-0.5">
             <p className="font-semibold text-primary">Enable Background Alerts on iPhone / iPad</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Apple requires web apps to be installed to receive background alerts. Tap Safari's <strong>Share</strong> button and select <strong>'Add to Home Screen'</strong> to enable lock-screen health reminders.
+              Apple requires web apps to be installed to receive background alerts. Tap Safari's{" "}
+              <strong>Share</strong> button and select <strong>'Add to Home Screen'</strong> to
+              enable lock-screen health reminders.
             </p>
           </div>
         </div>

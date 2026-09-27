@@ -43,7 +43,52 @@ export async function login(email: string, password: string) {
 }
 
 export const logout = () => signOut(getFirebaseAuth());
-export const resetPassword = (email: string) => sendPasswordResetEmail(getFirebaseAuth(), email);
+
+export async function sendPasswordResetOtp(email: string) {
+  const res = await fetch("/api/auth/otp/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return res.json() as Promise<{
+    ok: boolean;
+    message?: string;
+    error?: string;
+    cooldownRemainingSeconds?: number;
+    expiresInSeconds?: number;
+  }>;
+}
+
+export async function verifyPasswordResetOtp(email: string, otp: string) {
+  const res = await fetch("/api/auth/otp/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp }),
+  });
+  return res.json() as Promise<{
+    ok: boolean;
+    resetSessionToken?: string;
+    message?: string;
+    error?: string;
+    attemptsLeft?: number;
+  }>;
+}
+
+export async function resetPasswordWithToken(resetSessionToken: string, newPassword: string) {
+  const res = await fetch("/api/auth/otp/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resetSessionToken, newPassword }),
+  });
+  return res.json() as Promise<{
+    ok: boolean;
+    message?: string;
+    error?: string;
+  }>;
+}
+
+export const resetPassword = (email: string) => sendPasswordResetOtp(email);
+
 export const watchAuth = (cb: (u: User | null) => void) =>
   onAuthStateChanged(getFirebaseAuth(), cb);
 

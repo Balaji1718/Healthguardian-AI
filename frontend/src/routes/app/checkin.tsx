@@ -68,7 +68,7 @@ function Checkin() {
   // Pure AI-driven check-in workspace: "composer" | "review"
   const [mode, setMode] = useState<"composer" | "review">("composer");
   const [activeSource, setActiveSource] = useState<CheckinSource>("conversational");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => checkinIdForDate(new Date()));
   const [form, setForm] = useState<FormState>(EMPTY);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [observations, setObservations] = useState<DailyCheckin["observations"]>([]);
@@ -332,6 +332,8 @@ function Checkin() {
 
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["checkins"] }),
+        qc.invalidateQueries({ queryKey: ["healthRecords"] }),
+        qc.invalidateQueries({ queryKey: ["verifiedMedicalResults"] }),
         qc.invalidateQueries({ queryKey: ["dashboard"] }),
         qc.invalidateQueries({ queryKey: ["risk"] }),
         qc.invalidateQueries({ queryKey: ["baselines"] }),

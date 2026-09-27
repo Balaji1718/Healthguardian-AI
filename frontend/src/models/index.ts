@@ -104,6 +104,16 @@ export interface MedicalReport {
   notes?: string | undefined;
 }
 
+export interface GroundingStatusRecord {
+  testName?: string | undefined;
+  resultValue?: string | undefined;
+  unit?: string | undefined;
+  referenceRange?: string | undefined;
+  flag?: string | undefined;
+  sourcePageValid?: string | undefined;
+  overall?: string | undefined;
+}
+
 export interface MedicalResult {
   id?: string | undefined;
   testName: string;
@@ -119,7 +129,7 @@ export interface MedicalResult {
   isAmbiguous?: boolean | undefined;
   ambiguityReason?: string | undefined;
   ambiguousFields?: string[] | undefined;
-  groundingStatus?: Record<string, string> | undefined;
+  groundingStatus?: GroundingStatusRecord | Record<string, string> | undefined;
   section?: string | undefined;
   userVerified: boolean;
   userEdited?: boolean | undefined;
