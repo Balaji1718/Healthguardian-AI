@@ -656,13 +656,34 @@ export function reconcileWithSourceOcr(
  * - Enforces flag safety: never converts uncertain/missing flag into "normal"
  * - Normalizes field-level ambiguity tracking
  */
+interface RawCandidateInput {
+  testName?: unknown;
+  resultValue?: unknown;
+  numericValue?: unknown;
+  referenceLow?: unknown;
+  referenceHigh?: unknown;
+  referenceText?: unknown;
+  flag?: unknown;
+  ambiguousFields?: unknown;
+  isAmbiguous?: unknown;
+  ambiguityReason?: unknown;
+  unit?: unknown;
+  section?: unknown;
+  sourcePage?: unknown;
+  ocrConfidence?: unknown;
+  aiConfidence?: unknown;
+  confidence?: unknown;
+}
+
 export function validateMedicalCandidate(
-  raw: Record<string, unknown>,
+  rawInput: Record<string, unknown>,
   defaultPage = 1,
 ): { valid: boolean; candidate?: StructuredBiomarkerCandidate; rejectionReason?: string } {
-  if (!raw || typeof raw !== "object") {
+  if (!rawInput || typeof rawInput !== "object") {
     return { valid: false, rejectionReason: "Row is not an object" };
   }
+
+  const raw = rawInput as RawCandidateInput;
 
   const rawTestName = String(raw.testName || "").trim();
   const rawResultVal = String(raw.resultValue != null ? raw.resultValue : "").trim();
@@ -799,11 +820,16 @@ export function validateMedicalCandidate(
       referenceText: refText,
       flag,
       section: String(raw.section || "General Results").trim(),
-      sourcePage: Number.isInteger(raw.sourcePage) ? raw.sourcePage : defaultPage,
+      sourcePage: typeof raw.sourcePage === "number" ? raw.sourcePage : defaultPage,
       ocrConfidence: typeof raw.ocrConfidence === "number" ? raw.ocrConfidence : 0.95,
-      aiConfidence: ["high", "medium", "low"].includes(raw.aiConfidence || raw.confidence)
-        ? raw.aiConfidence || raw.confidence
-        : "high",
+      aiConfidence:
+        typeof raw.aiConfidence === "string" &&
+        (raw.aiConfidence === "high" || raw.aiConfidence === "medium" || raw.aiConfidence === "low")
+          ? raw.aiConfidence
+          : typeof raw.confidence === "string" &&
+              (raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "low")
+            ? raw.confidence
+            : "high",
       isAmbiguous,
       ambiguityReason,
       ambiguousFields,

@@ -1,9 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 // --- MOCKING ENGINE.TS ---
-const tsPath = path.resolve("..", "frontend", "src", "features", "healthRisk", "engine.ts");
+const tsPath = path.resolve(__dirname, "../frontend/src/features/healthRisk/engine.ts");
 let tsContent = await fs.readFile(tsPath, "utf8");
 
 // Mock constants and imports so it runs in Node without frontend assets
@@ -159,7 +162,7 @@ console.log(`PERF-001 - PASS: Calculated 100 baseline profiles in ${elapsed.toFi
 assert.ok(elapsed < 100, "Performance threshold exceeded (100 runs must be under 100ms)");
 
 // --- TASK 9: MEDICAL FILE PRIVACY GATE VERIFICATION ---
-const repositoriesPath = path.resolve("..", "frontend", "src", "services", "firebase", "repositories.ts");
+const repositoriesPath = path.resolve(__dirname, "../frontend/src/services/firebase/repositories.ts");
 const repContent = await fs.readFile(repositoriesPath, "utf8");
 
 // Verify firestore upload function does not transmit raw bytes
@@ -167,14 +170,14 @@ const hasFileBytesUpload = repContent.includes("Blob") && repContent.includes("r
 assert.equal(hasFileBytesUpload, false, "Raw report bytes should never be sent to Firestore");
 console.log("PRIVACY-001 - PASS: Firestore report repository only saves metadata. Raw report bytes are not transmitted.");
 
-const documentsPath = path.resolve("..", "frontend", "src", "services", "localStorage", "documents.ts");
+const documentsPath = path.resolve(__dirname, "../frontend/src/services/localStorage/documents.ts");
 const docContent = await fs.readFile(documentsPath, "utf8");
 const usesIndexedDB = docContent.includes("db()") && docContent.includes("put(STORE,");
 assert.equal(usesIndexedDB, true, "Raw medical files must be stored in IndexedDB only");
 console.log("PRIVACY-002 - PASS: Raw report files are stored locally in browser IndexedDB.");
 
 // --- TASK 6: AI GROUNDING / SAFETY RULE CHECKS ---
-const agentPath = path.resolve("..", "frontend", "src", "features", "agent", "agent.ts");
+const agentPath = path.resolve(__dirname, "../frontend/src/features/agent/agent.ts");
 const agentContent = await fs.readFile(agentPath, "utf8");
 
 // Verify system prompt safety constraints are set

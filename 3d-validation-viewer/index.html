@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>HealthGuardian 3D Asset Validation Viewer</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body, html { width: 100%; height: 100%; overflow: hidden; background: #090d16; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #f1f5f9; }
+      #root { width: 100%; height: 100%; position: relative; }
+      @media (max-width: 700px) {
+        .validation-shell { display: block !important; }
+        .validation-viewport { width: 100% !important; height: 100% !important; }
+        .validation-panel { position: absolute !important; top: 0; right: 0; width: min(285px, 86vw) !important; height: 100% !important; z-index: 30; opacity: 0.96; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

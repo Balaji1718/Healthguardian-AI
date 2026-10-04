@@ -1,6 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  AnatomicalScene,
+  mapHealthDataToAnatomy,
+  type AnatomicalRegionState,
+} from "@/features/anatomy";
 import {
   Activity,
   ArrowRight,
@@ -84,6 +89,21 @@ function Dashboard() {
 
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [clearingDemo, setClearingDemo] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<AnatomicalRegionState | null>(null);
+
+  const regionStates = useMemo(
+    () => mapHealthDataToAnatomy(checkins, verifiedResults, patterns),
+    [checkins, verifiedResults, patterns],
+  );
+
+  const selectedRegionId = selectedRegion?.id;
+
+  // Keep selected region in sync when records change
+  useEffect(() => {
+    if (selectedRegionId) {
+      setSelectedRegion(regionStates[selectedRegionId] || null);
+    }
+  }, [regionStates, selectedRegionId]);
 
   const adaptiveEvidence = calculateAdaptiveEvidence(checkins);
   const healthContext = buildHealthContext(adaptiveEvidence);
@@ -221,6 +241,36 @@ function Dashboard() {
           </Button>
         }
       />
+
+      {/* 3D Anatomical Health Map Hero Section */}
+      <section className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 px-0.5">
+          <div className="space-y-0.5">
+            <h2 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+              <Activity className="size-4 text-primary" />
+              <span>{t("dashboard.anatomy.title") || "Interactive 3D Health Map"}</span>
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {t("dashboard.anatomy.subtitle") ||
+                "Your recorded health information mapped directly to human anatomy."}
+            </p>
+          </div>
+          <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline-block">
+            {t("dashboard.anatomy.interactionHint") ||
+              "Rotate • Zoom • Select an anatomical region for available health information"}
+          </span>
+        </div>
+
+        {/* Dominant 3D Anatomical Health Map Viewport */}
+        <div className="w-full rounded-3xl overflow-hidden border border-border/70 bg-gradient-to-b from-card/80 via-background to-card/60 shadow-xl relative min-h-[640px] sm:min-h-[720px] lg:min-h-[780px]">
+          <AnatomicalScene
+            regionStates={regionStates}
+            selectedRegion={selectedRegion}
+            onSelectRegion={setSelectedRegion}
+            className="w-full h-[640px] sm:h-[720px] lg:h-[780px]"
+          />
+        </div>
+      </section>
 
       {checkins.length === 0 ? (
         <div className="space-y-6">

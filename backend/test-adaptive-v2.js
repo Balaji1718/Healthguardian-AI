@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Helper to load and strip a TypeScript file for Node.js evaluation
 async function loadTsFile(filePath, exportsToReturn) {
@@ -38,7 +41,7 @@ async function loadTsFile(filePath, exportsToReturn) {
 
 console.log("Loading and compiling Adaptive Health Intelligence v2 modules...");
 
-const srcDir = path.resolve("..", "frontend", "src", "core", "adaptive");
+const srcDir = path.resolve(__dirname, "../frontend/src/core/adaptive");
 
 const configContent = await loadTsFile(path.join(srcDir, "config.ts"));
 const baselineContent = await loadTsFile(path.join(srcDir, "baseline.ts"));
@@ -230,7 +233,7 @@ check("context explanationSignals has water pattern", context.explanationSignals
 // ------------------------------------------------------------
 console.log("\n[Test 6: F-005 Emergency Gate Normalization]");
 
-const agentPath = path.resolve("..", "frontend", "src", "features", "agent", "agent.ts");
+const agentPath = path.resolve(__dirname, "../frontend/src/features/agent/agent.ts");
 const agentRaw = await fs.readFile(agentPath, "utf8");
 
 function cleanFn(code) {

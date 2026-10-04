@@ -114,8 +114,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Skip API calls
-  if (event.request.url.includes("/api/")) {
+  // Skip API calls and large binary 3D models
+  if (event.request.url.includes("/api/") || event.request.url.includes("/models/")) {
     return;
   }
 
