@@ -19,7 +19,7 @@ import { sendUserPush, verifyIdToken, getAdminApp } from './firebase-admin.js';
 import { sendPasswordResetOtp, verifyPasswordResetOtp, resetPasswordWithToken } from './auth-otp.js';
 
 const frontendRoot = path.resolve(__dirname, '../frontend');
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
 const port = Number(process.env.PORT) || 3000;
 const app = express();
 const server = http.createServer(app);
@@ -480,8 +480,13 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
-const host = process.env.HOST || '0.0.0.0';
-server.listen(port, host, () => {
-  console.log(`HealthGuardian app running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
-});
+if (!process.env.VERCEL) {
+  const host = process.env.HOST || '0.0.0.0';
+  server.listen(port, host, () => {
+    console.log(`HealthGuardian app running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
+  });
+}
+
+export default app;
+
 
